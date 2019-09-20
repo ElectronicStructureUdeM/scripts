@@ -1,2 +1,2 @@
 # scripts
-Useful scripts in python using to compute various properties such as atomization energies
+Useful scripts in python using PySCF to compute various properties such as atomization energies
