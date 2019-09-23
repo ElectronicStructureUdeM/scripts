@@ -39,10 +39,42 @@ def calc_energy_dft(atom,spin,functional):
     mol.build()
     mf = scf.KS(mol)
     mf.small_rho_cutoff = 1e-12
-    mf.xc=functional
+    mf.xc="pbe"
     mf.kernel()
     pbe_exc=mf.get_veff().exc
-    return mf.e_tot
+    if functional=="pbe":
+        return mf.e_tot
+    else:
+        if dft.libxc.is_meta_gga(functional):
+            deriv=2
+            xctype="MGGA"
+        elif dft.libxc.is_gga(functional):
+            deriv=1
+            xctype="GGA"
+        else:
+            deriv=0
+            xctype="LDA"
+        grids = mf.grids
+        ao_value = numint.eval_ao(mol, grids.coords, deriv=deriv)
+        dm = mf.make_rdm1()
+        if spin ==0:
+            rho = numint.eval_rho(mol, ao_value, dm, xctype=xctype)
+            exc,vxc = dft.libxc.eval_xc(functional, rho)[:2]
+            if xctype=="LDA":
+                Exc = np.einsum('i,i,i->', exc, rho,grids.weights)
+            else:
+                Exc = np.einsum('i,i,i->', exc, rho[0],grids.weights)
+            return mf.e_tot-pbe_exc+Exc
+        else:
+            rhoA = numint.eval_rho(mol, ao_value, dm[0], xctype=xctype)
+            rhoB = numint.eval_rho(mol, ao_value, dm[1], xctype=xctype)
+            exc, vxc= dft.libxc.eval_xc(functional, [rhoA,rhoB],spin=spin)[:2]
+            if xctype=="LDA":
+                Exc = np.einsum('i,i,i->', exc, rhoA+rhoB,grids.weights)
+            else:
+                Exc = np.einsum('i,i,i->', exc, rhoA[0]+rhoB[0],grids.weights)
+            return mf.e_tot-pbe_exc+Exc
+
 
 
 def compute_ex_exact(mol,ao_value,dm,coord):
