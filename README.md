@@ -1,4 +1,5 @@
 # scripts
+<<<<<<< HEAD
 Scripts to compute the total energy of atoms from H to Ar using converged PBE densities.
 * Non self consistant calculation
 * Right now it only works with the basis set 6-311+g(2d,p) download from basis set exchange
@@ -7,3 +8,6 @@ Scripts to compute the total energy of atoms from H to Ar using converged PBE de
 
 # TODO
 * Add the exchange-correlation factor
+=======
+Useful scripts in python using PySCF to compute various properties such as atomization energies
+>>>>>>> c2949ac554019cbfa44d35b23cae9b01455c9387
