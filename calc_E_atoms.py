@@ -22,7 +22,7 @@ TODO:
 """
 
 lib.num_threads(1)# pySCF will only use 1 thread
-#Dictionary with the atoms and it's spin
+#Dictionary with the atoms and it's total spin
 atoms={"H":1,"He":0,"Li":1,"Be":0,"B":1,"C":2,"N":3,
         "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,
         "Mg":0,"Al":1,"Si":2,"P":3,"S":2,"Cl":1,"Ar":0}

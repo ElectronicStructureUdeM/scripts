@@ -18,7 +18,7 @@ Output:
 TODO
     Making the code more flexible to chose other basis sets.
     automatic way to check if calc_E_atoms.py was already done
-    Prettier format for atommization.txt
+    Prettier format for atomization.txt
 """
 
     
@@ -40,7 +40,7 @@ def open_E_atoms():
             atom_E[atom] = float(E)
     fh.close()
     return atom_E
-    
+
 def atomization(mol,positions,spin,functional):
     """
     Function to calculate the atomization energy of a molecule with a functional from PBE converged densities.
