@@ -54,6 +54,7 @@ def calc_energy_Exks(molec,positions,spin):
     mol.build()
     mf = scf.KS(mol)
     mf.small_rho_cutoff = 1e-12
+    mf.grids.radi_method=dft.radi.delley
     mf.xc='pbe'
     mf.kernel()
     Exc_pbe=mf.get_veff().exc
