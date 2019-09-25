@@ -1,7 +1,7 @@
 from pyscf import gto,scf,dft
 import numpy as np
 import scipy
-import azcalrmou
+import calcrhoru
 def gto_cart_norm(nx,ny,nz,alpha):
     """
     Compute the normalization constant for gaussian basis set.
@@ -108,11 +108,12 @@ def calc_rhoru(mol,mf,grids):
     nU = 2500
     smallU = 1e-3
     maxU= 50.0
-    ux, uwei = azcalrmou.azwghtuni(smallU,nU,maxU)
+    ux, uwei = calcrhoru.azwghtuni(smallU,nU,maxU)
     uwei[0]=uwei[0]+smallU/2.
     #calculate rhoru for a all grid
     nGrid = np.shape(grids.coords)[0]
     rhoruA=np.zeros((nGrid,nU))
+    print(calcrhoru.calcrhorupol.__doc__)
     if (mol.nelectron==1):
         NMOA = np.count_nonzero(mf.mo_occ[0])
     if (mol.spin==0 and mol.nelectron>1):
@@ -121,16 +122,13 @@ def calc_rhoru(mol,mf,grids):
         rhoruB=np.zeros((nGrid,nU))
         NMOA = np.count_nonzero(mf.mo_occ[0])
         NMOB = np.count_nonzero(mf.mo_occ[1])
-
-    for gridID in range(nGrid):
-        if (mol.nelectron==1):
-            rhoruA[gridID] = azcalrmou.calcrhoru(NMOA,aoCoef,pgInfo,grids.coords[gridID],mf.mo_coeff[0],ux)
-        if (mol.spin==0 and mol.nelectron>1):
-            rhoruA[gridID] = azcalrmou.calcrhoru(NMOA,aoCoef,pgInfo,grids.coords[gridID],mf.mo_coeff,ux)
-        if (mol.spin>0 and mol.nelectron>1):
-            #alpha
-            rhoruA[gridID] = azcalrmou.calcrhoru(NMOA,aoCoef,pgInfo,grids.coords[gridID],mf.mo_coeff[0],ux)
-            #beta
-            rhoruB[gridID] = azcalrmou.calcrhoru(NMOB,aoCoef,pgInfo,grids.coords[gridID],mf.mo_coeff[1],ux)
+    if (mol.nelectron==1):
+        rhoruA = calcrhoru.calcrhoru(NMOA,aoCoef,pgInfo,grids.coords,mf.mo_coeff[0],ux)
+    if (mol.spin==0 and mol.nelectron>1):
+        rhoruA = calcrhoru.calcrhoru(NMOA,aoCoef,pgInfo,grids.coords,mf.mo_coeff,ux)
+    if (mol.spin>0 and mol.nelectron>1):
+        #alpha
+        rhoruA,rhoruB = calcrhoru.calcrhorupol(NMOA,NMOB,aoCoef,pgInfo,grids.coords,
+                        mf.mo_coeff[0],mf.mo_coeff[1],ux)
     if mol.spin==0:return ux,uwei,2*rhoruA
     else:return ux,uwei,rhoruA,rhoruB
