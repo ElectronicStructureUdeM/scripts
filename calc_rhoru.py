@@ -1,4 +1,4 @@
-from pyscf import gto,scf,dft
+from pyscf import gto,scf,dft,lib
 import numpy as np
 import scipy
 import calcrhoru
@@ -113,7 +113,6 @@ def calc_rhoru(mol,mf,grids):
     #calculate rhoru for a all grid
     nGrid = np.shape(grids.coords)[0]
     rhoruA=np.zeros((nGrid,nU))
-    print(calcrhoru.calcrhorupol.__doc__)
     if (mol.nelectron==1):
         NMOA = np.count_nonzero(mf.mo_occ[0])
     if (mol.spin==0 and mol.nelectron>1):
@@ -130,5 +129,30 @@ def calc_rhoru(mol,mf,grids):
         #alpha
         rhoruA,rhoruB = calcrhoru.calcrhorupol(NMOA,NMOB,aoCoef,pgInfo,grids.coords,
                         mf.mo_coeff[0],mf.mo_coeff[1],ux)
-    if mol.spin==0:return ux,uwei,2*rhoruA
+    if mol.spin==0 or mol.nelectron==1:return ux,uwei,rhoruA,rhoruA
     else:return ux,uwei,rhoruA,rhoruB
+
+def output_rhoRU_atoms():
+    atoms={"H":1,"He":0,"Li":1,"Be":0,"B":1,"C":2,"N":3,
+        "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,
+        "Mg":0,"Al":1,"Si":2,"P":3,"S":2,"Cl":1,"Ar":0}
+    for atom in atoms:
+        print("Begin atom: "+atom)
+        mol = gto.Mole()
+        mol.atom=atom
+        mol.cart=True
+        mol.spin=atoms[atom]
+        mol.basis = '6-311+g2dp.nw'
+        mol.build()
+        mf = scf.KS(mol)
+        mf.small_rho_cutoff = 1e-12
+        mf.xc='pbe'
+        mf.grids.radi_method=dft.radi.delley
+        mf.kernel()
+
+        #grid
+        grids = mf.grids
+        ux,uwei,rhoRUA,rhoRUB= calc_rhoru(mol,mf,grids)
+        np.save(atom,[ux,uwei,rhoRUA,rhoRUB])
+lib.num_threads(8)
+output_rhoRU_atoms()

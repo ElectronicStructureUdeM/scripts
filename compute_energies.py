@@ -117,6 +117,7 @@ def calc_energy_dft(molec,positions,spin,functional):
     mol.basis = '6-311+g2dp.nw' # downloaded from BSE
     mol.build()
     mf = scf.KS(mol)
+    mf.grids.radi_method=dft.radi.delley
     mf.small_rho_cutoff = 1e-12
     mf.xc="pbe"
     mf.kernel()

@@ -69,7 +69,7 @@ def atomization(mol,positions,spin,functional):
             mol_exist=True
     if mol_exist == False: 
         if functional=="EXKS":
-            E_mol =calc_energy_exks(mol,positions,spin)
+            E_mol =calc_energy_Exks(mol,positions,spin)
         else:
             E_mol=calc_energy_dft(mol,positions,spin,functional)
         tot_E_atoms=0
