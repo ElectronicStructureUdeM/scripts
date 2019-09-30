@@ -1,13 +1,15 @@
-from pyscf import gto,scf,dft
+from pyscf import gto,scf,dft,lib
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
-from pyscf import lib
-from scipy.optimize import brentq
 from compute_energies import compute_ex_exact
-def calcFx4(alpha,beta,xi,gamma,u):
+import BRx
+from numba import vectorize, float64
+
+@vectorize([float64(float64, float64,float64,float64,float64)])
+def calcFx4Plus(alpha,beta,xi,gamma,u):
     """
-    Calculate the 4 parameters exchange factor:
+    Calculate the 4 parameters exchange factor if its positive:
         fx = -1/2+alpha*u**2+beta*u**4+xi*u**6)*np.exp(-gamma*u**2)
     Input:
         alpha: float
@@ -19,7 +21,11 @@ def calcFx4(alpha,beta,xi,gamma,u):
     Return:
         fx4: float
     """
-    return (-1./2.+alpha*u**2+beta*u**4+xi*u**6)*np.exp(-gamma*u**2)
+    fx = (-1./2.+alpha*u**2+beta*u**4+xi*u**6)*np.exp(-gamma*u**2)
+    if fx>0:
+        return fx
+    else:
+        return 0.
 
 def calcIntRhoRUFX(power, gamma,rhoRU,ux,uwei):
     """
@@ -57,9 +63,7 @@ def calcIntRhoXPlus(power,alpha,beta,xi,gamma,rhoRU,ux,uwei):
     Returns:
         integral value (float)
     """
-    vfunc = np.vectorize(calcFx4)
-    fx= vfunc(alpha,beta,xi,gamma,ux)
-    fxPlus = (fx>0)*fx
+    fxPlus= calcFx4Plus(alpha,beta,xi,gamma,ux)
     return np.einsum("i,i,i,i->",ux**power,rhoRU,uwei,fxPlus)
 
 def findGamma(gamma,norm,rhoRU,ux,uwei):
@@ -94,7 +98,7 @@ def calcGamma(norm,rhoRU,ux,uwei):
         gamma: float
     """
 
-    return brentq(findGamma,-1e-3,1000,args=(norm,rhoRU,ux,uwei))
+    return scipy.optimize.brentq(findGamma,-1e-1,1000,args=(norm,rhoRU,ux,uwei))
 
 def calcAlphaBetaXi(gamma,norm,epsilonX,Q,lap,rho,rhoRU,ux,uwei):
     """
@@ -142,6 +146,7 @@ def calcAlphaBetaXi(gamma,norm,epsilonX,Q,lap,rho,rhoRU,ux,uwei):
     beta,xi = np.linalg.solve(a_data,b_data)
     return alpha,beta,xi
 
+
 def calcFx4Params(norm,epsilonX,Q,lap,rho,rhoRU,ux,uwei):
     """Calculate all the parameters of fx4
     See the previous function for details
@@ -150,8 +155,7 @@ def calcFx4Params(norm,epsilonX,Q,lap,rho,rhoRU,ux,uwei):
     alpha,beta,xi=calcAlphaBetaXi(gamma,norm,epsilonX,Q,lap,rho,
                                rhoRU,ux,uwei)
     return gamma,alpha,beta,xi
-
-def calcRhoXPlus(ao_value,dm,grids,norm,rhoRU):
+def calcRhoXPlus(ao_value,dm,grids,rhoRU):
     """
     To calculate the integral of the positive part of rhox
     """
@@ -167,7 +171,11 @@ def calcRhoXPlus(ao_value,dm,grids,norm,rhoRU):
     rhoXIntPlusPBE=np.zeros(nGrid)
     rhoXIntPlusExact=np.zeros(nGrid)
     ux2 = ux**2
+    
     for gridID in range(nGrid):
+        a,b,c,n=BRx.brhparam([rho[gridID]/2.,dRhoX[gridID]/2.,dRhoY[gridID]/2.,dRhoZ[gridID]/2.,
+                            lap[gridID]/2.,tau[gridID]/2.],epsilonXExact[gridID])
+        norm=-n
         gamma,alpha,beta,xi =  calcFx4Params(norm,epsilonX[gridID],Q[gridID],lap[gridID],rho[gridID],rhoRU[gridID],ux,uwei)
         rhoXIntPlusPBE[gridID]=4.*np.pi*calcIntRhoXPlus(2,alpha,beta,xi,gamma,rhoRU[gridID],ux,uwei)
         alpha,beta,xi=calcAlphaBetaXi(gamma,norm,epsilonXExact[gridID],Q[gridID],
@@ -180,9 +188,9 @@ def calcRhoXPlus(ao_value,dm,grids,norm,rhoRU):
 #calculate PBE
 lib.num_threads(1)
 mol = gto.Mole()
-mol.atom='Cl'
+mol.atom='Ar'
 mol.cart=True
-mol.spin=1
+mol.spin=0
 mol.basis = '6-311+g2dp.nw'
 mol.build()
 mf = scf.KS(mol)
@@ -193,23 +201,26 @@ mf.kernel()
 
 #grid and rhoru
 grids = mf.grids
-ux,uwei,rhoRUA,rhoRUB = np.load(mol.atom+".npy",allow_pickle=True)
+if mol.spin ==0:
+    ux,uwei,rhoRUA = np.load(mol.atom+".npy",allow_pickle=True)
+else:
+    ux,uwei,rhoRUA,rhoRUB = np.load(mol.atom+".npy",allow_pickle=True)
 R = np.linalg.norm(grids.coords,axis=1)
 
 #densities
 ao_value = dft.numint.eval_ao(mol, grids.coords, deriv=2)
 if mol.spin==0:
     dmA = mf.make_rdm1(mo_occ=mf.mo_occ/2)
-    rhoXIntPlusPBEA,rhoXIntPlusExactA=calcRhoXPlus(ao_value,dmA,grids,-1,2*rhoRUA)
+    rhoXIntPlusPBEA,rhoXIntPlusExactA=calcRhoXPlus(ao_value,dmA,grids,2*rhoRUA)
     dmB=dmA
     rhoXIntPlusPBEB=rhoXIntPlusPBEA
     rhoXIntPlusExactB=rhoXIntPlusExactA
 else:
     dmA = mf.make_rdm1()[0]
-    rhoXIntPlusPBEA,rhoXIntPlusExactA=calcRhoXPlus(ao_value,dmA,grids,-1,2*rhoRUA)
+    rhoXIntPlusPBEA,rhoXIntPlusExactA=calcRhoXPlus(ao_value,dmA,grids,2*rhoRUA)
     dmB=mf.make_rdm1()[1]
     if mol.nelectron>1:
-        rhoXIntPlusPBEB,rhoXIntPlusExactB=calcRhoXPlus(ao_value,dmB,grids,-1,2*rhoRUB)
+        rhoXIntPlusPBEB,rhoXIntPlusExactB=calcRhoXPlus(ao_value,dmB,grids,2*rhoRUB)
     else:
         rhoXIntPlusPBEB=np.zeros(np.shape(grids.coords)[0])
         rhoXIntPlusExactB=np.zeros(np.shape(grids.coords)[0])
