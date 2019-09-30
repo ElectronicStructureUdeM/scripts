@@ -4,6 +4,7 @@
 *.png
 *.o
 tmp*
+*.lprof
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
