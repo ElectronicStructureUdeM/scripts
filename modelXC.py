@@ -2,7 +2,7 @@ from pyscf import dft,gto,lib,scf
 import re
 import numpy as np
 class ModelXC:
-    def __init__(self,molecule,positions,spin,approx='PBE',basis='6-311+g2dp.nw',num_threads=1):
+    def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
         """
         In the init, the pyscf Mole object and scf.ks object will be created
         """
@@ -139,7 +139,34 @@ class ModelXC:
             self.eps_x_down,vx_down = dft.libxc.eval_xc(exchange_functional+",", [zeros,self.rho_down],spin=5)[:2]
             self.eps_c,vc = dft.libxc.eval_xc(","+correlation_functional,[self.rho_up,self.rho_down],spin=5)[:2]
 
-fxc = ModelXC("Ar",[[0,0,0]],0)
-#fxc.calc_energy_Exks()
-fxc.calc_eps_xc_post_approx("pbe,pbe")
-print(np.einsum("i,i,i->",fxc.eps_x_up+fxc.eps_x_down+fxc.eps_c,fxc.rho_up,fxc.weights))
+    def calc_Exc_post_approx(self,functional):
+        if self.approx==functional:
+            return self.approx_Exc
+        else:
+            try: 
+                Ex_up = np.einsum("i,i,i->",self.eps_x_up,self.rho_up,self.weights)
+                Ex_down = np.einsum("i,i,i->",self.eps_x_down,self.rho_down,self.weights)
+                Ec = np.einsum("i,i,i->",self.eps_c,self.rho_tot,self.weights)
+                self.Exc_post_approx = Ex_up+Ex_down+Ec
+            except AttributeError:#if it was never calculated before
+                self.calc_eps_xc_post_approx(functional)
+                Ex_up = np.einsum("i,i,i->",self.eps_x_up,self.rho_up,self.weights)
+                Ex_down = np.einsum("i,i,i->",self.eps_x_down,self.rho_down,self.weights)
+                Ec = np.einsum("i,i,i->",self.eps_c,self.rho_tot,self.weights)
+                self.Exc_post_approx = Ex_up+Ex_down+Ec
+            finally:
+                return self.Exc_post_approx
+
+    def calc_Etot_post_approx(self,functional):
+        if self.approx==functional:
+            return self.mf.e_tot
+        else:
+            try:
+                self.Etot_post_approx=self.mf.e_tot-self.approx_Exc+self.Exc_post_approx
+            except AttributeError:
+                self.calc_Exc_post_approx(functional)
+                self.Etot_post_approx=self.mf.e_tot-self.approx_Exc+self.Exc_post_approx
+            finally:
+                return self.Etot_post_approx
+fxc = ModelXC("Ar",[[0,0,0]],0,approx='pbe,pbe')
+print(fxc.calc_Etot_post_approx("lda,pw_mod"))
