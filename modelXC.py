@@ -5,6 +5,19 @@ class ModelXC:
     def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
         """
         In the init, the pyscf Mole object and scf.ks object will be created
+        Input:
+            molecule:string
+                the string for the molecule where all the element symbol are present i.e.: CHHHH and not Ch4
+            positions:list of list
+                The positions for each atoms in angstromg
+            spin:int
+                total spin of the molecule
+            approx:string
+                the functional in pyscf format
+            basis:string
+                the basis set in pyscf format
+            num_threads:int
+                the number of threads for pyscf
         """
         lib.num_threads(num_threads)
         self.approx=approx
@@ -20,6 +33,7 @@ class ModelXC:
         self.mol.verbose=0
         self.mol.spin=spin
         self.mol.basis = basis # downloaded from BSE
+        self.mol.cart=True
         self.mol.build()
         self.mf = scf.KS(self.mol)
         self.mf.small_rho_cutoff = 1e-12
@@ -61,25 +75,24 @@ class ModelXC:
         for a grid point.
         See the appendix of https://doi.org/10.1063/1.5083840 for details.
         Input:
-            ao_value(array): ao values for a grid point
-            dm(array): density matrix
-            coord(array): x,y,z coordinates
+            ao_value: array
+                ao values for a grid point
+            dm: array
+                density matrix
+            coord:array 
+                x,y,z coordinates
         Returns:
-            ex(float):ex^ks
+            ex:float
+                ex^ks
         """
         with self.mol.with_rinv_origin((coord[0],coord[1],coord[2])):
             A = self.mol.intor('int1e_rinv')
         F = np.dot(dm,ao_value)
         return -np.einsum('i,j,ij',F,F,A)/2.
-
-    def calc_Exks(self):
+        
+    def calc_eps_xks_post_approx(self):
         """
-        Function to compute the total energy of a molecule with 
-        exchange exchange KS.
-        The energies are are calculated post-approx (not self-consi).
-        TODO:
-            This could is quite fast, but could probably be made faster if 
-            the calculation over the grid was compiled but using directly libcint
+        To calculate the exact exchange energy density on the grid
         """
         self.ex_exact_up=np.zeros(self.n_grid)
         self.ex_exact_down=np.zeros(self.n_grid)
@@ -95,51 +108,75 @@ class ModelXC:
                                                 self.dm_up,self.coords[gridID])
                 self.ex_exact_down[gridID] = self.compute_ex_exact(self.ao_values[0,gridID,:],
                                                 self.dm_down,self.coords[gridID])
+    def calc_Exks_post_approx(self):
+        """
+        Function to compute the total exchange energy of a molecule with 
+        exact exchange exchange KS.
+        The energies are are calculated post-approx (not self-consitent).
+        """
 
-        self.Ex_KS_tot= np.einsum('i,i->', self.ex_exact_up+self.ex_exact_down, 
+        try:
+            self.Ex_KS_tot= np.einsum('i,i->', self.ex_exact_up+self.ex_exact_down, 
                                             self.weights)
-        return self.Ex_KS_tot
+        except AttributeError:
+            self.calc_eps_xks_post_approx()
+            self.Ex_KS_tot= np.einsum('i,i->', self.ex_exact_up+self.ex_exact_down, 
+                                            self.weights)
+        finally:
+            return self.Ex_KS_tot
     
     def calc_total_energy_Ex_ks(self):
         """
         To return the total energy using exact KS exchange
-        with post-approx orbitls
         """
         try: 
             return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
         except AttributeError:#if it was never calculated before
-            self.calc_Exks()
+            self.calc_Exks_post_approx()
             return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
             
     def calc_eps_xc_post_approx(self,functional):
         """
         This function calculates the exchange-correlation energy densities
-        from a functional in with converged self-consistant approx. densities
+        from a functional with converged self-consistant  densities
         Warning: both exchange and correlation must be specified ie. pbe,pbe and not pbe
+        Input:
+            functional:string
+                functional name in pyscf format
         TODO:
             For spin unpolarized, the calculation are done uselessly for down spin
         """
         #here spin is defined as greater than one so we can exact up and down energies densites
         exchange_functional,correlation_functional = functional.split(",")
         zeros=np.zeros(self.n_grid) # also used so we can exact up and down energies densites
+        #mgga
         if dft.libxc.is_meta_gga(functional):
             mgga_up = [self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up]
             mgga_down = [self.rho_down,self.dx_rho_down,self.dy_rho_down,self.dz_rho_down,self.lap_down,self.tau_down]
             self.eps_x_up,vx_up = dft.libxc.eval_xc(exchange_functional+",", [mgga_up,[zeros,zeros,zeros,zeros,zeros,zeros]],spin=5)[:2]
             self.eps_x_down,vx_down = dft.libxc.eval_xc(exchange_functional+",", [[zeros,zeros,zeros,zeros,zeros,zeros],mgga_down],spin=5)[:2]
             self.eps_c,vc = dft.libxc.eval_xc(","+correlation_functional,[mgga_up,mgga_down],spin=5)[:2]
+        #gga
         elif dft.libxc.is_gga(functional):
             gga_up = [self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up]
             gga_down = [self.rho_down,self.dx_rho_down,self.dy_rho_down,self.dz_rho_down]
             self.eps_x_up,vx_up = dft.libxc.eval_xc(exchange_functional+",", [gga_up,[zeros,zeros,zeros,zeros]],spin=5)[:2]
             self.eps_x_down,vx_down = dft.libxc.eval_xc(exchange_functional+",", [[zeros,zeros,zeros,zeros],gga_down],spin=5)[:2]
             self.eps_c,vc = dft.libxc.eval_xc(","+correlation_functional,[gga_up,gga_down],spin=5)[:2]
+        #lda
         else:
             self.eps_x_up,vx_up = dft.libxc.eval_xc(exchange_functional+",", [self.rho_up,zeros],spin=5)[:2]
             self.eps_x_down,vx_down = dft.libxc.eval_xc(exchange_functional+",", [zeros,self.rho_down],spin=5)[:2]
             self.eps_c,vc = dft.libxc.eval_xc(","+correlation_functional,[self.rho_up,self.rho_down],spin=5)[:2]
 
     def calc_Exc_post_approx(self,functional):
+        """
+        To calculate the total exchange-correlation energy for a functional
+        in a post-approx manner
+        Input:
+            functional:string
+                functional in pyscf format
+        """
         if self.approx==functional:
             return self.approx_Exc
         else:
@@ -158,6 +195,14 @@ class ModelXC:
                 return self.Exc_post_approx
 
     def calc_Etot_post_approx(self,functional):
+        """
+        To calculate the total energies of a functional
+        with post-approx densities
+
+        Input:
+            functional:string
+                functional name in pyscf format
+        """
         if self.approx==functional:
             return self.mf.e_tot
         else:
