@@ -168,5 +168,3 @@ class ModelXC:
                 self.Etot_post_approx=self.mf.e_tot-self.approx_Exc+self.Exc_post_approx
             finally:
                 return self.Etot_post_approx
-fxc = ModelXC("Ar",[[0,0,0]],0,approx='pbe,pbe')
-print(fxc.calc_Etot_post_approx("lda,pw_mod"))
