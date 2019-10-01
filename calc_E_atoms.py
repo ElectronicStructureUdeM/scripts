@@ -1,15 +1,12 @@
-from pyscf import gto,scf,dft
-from pyscf import lib
-from pyscf.dft import numint
-from compute_energies import compute_ex_exact,calc_energy_Exks,calc_energy_dft
+from modelXC import ModelXC
 import numpy as np
 import sys
 """
 Description:
     This code can be used to compute the total energies of various atoms from H to Ar
-    with functional/6-311+g(2d,p) or Kohn-Sham exact exchange energy density post-PBE.
+    with a fonctional or Kohn-Sham exact exchange energy density post-pbe.
     To use it, it is important to download the basis set from https://www.basissetexchange.org
-    and name it 6-311+g2dp.nw.
+    and name it 6-311+g2dp.nw, since it is the one used by default.
     For the implementation of kohn-Sham exact exchange energy density, see the appendix of
     https://doi.org/10.1063/1.5083840 .
 
@@ -17,11 +14,9 @@ Usage: python3 calc_E_atom.py functional  (functional is a function from pySCF o
     It will create a file named E_atoms.txt with all the energies.
 
 TODO:
-    Make it more flexible to chose different basis sets
     A prettier format for E_atom.txt
 """
 
-lib.num_threads(1)# pySCF will only use 1 thread
 #Dictionary with the atoms and it's total spin
 atoms={"H":1,"He":0,"Li":1,"Be":0,"B":1,"C":2,"N":3,
         "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,
@@ -32,8 +27,9 @@ functional = sys.argv[1]
 f=open("E_atom.txt","w")
 f.write("Atom "+functional+"\n")
 for atom in atoms:
+    post_pbe  = ModelXC(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
     if functional=="EXKS":
-        f.write(atom +" %.8f\n"%calc_energy_Exks(atom,[[0,0,0]],atoms[atom]))
+        f.write(atom +" %.8f\n"%post_pbe.calc_total_energy_Ex_ks())
     else:
-        f.write(atom +" %.8f\n"%calc_energy_dft(atom,[[0,0,0]],atoms[atom],functional))
+        f.write(atom +" %.8f\n"%post_pbe.calc_Etot_post_approx(functional))
 f.close()
