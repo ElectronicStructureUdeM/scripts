@@ -21,6 +21,7 @@ class ModelXC:
         """
         lib.num_threads(num_threads)
         self.approx=approx
+        self.mol_name=molecule
         self.mol = gto.Mole()
         atoms = re.findall('[A-Z][^A-Z]*', molecule)
         molecule =[]
@@ -108,6 +109,8 @@ class ModelXC:
                                                 self.dm_up,self.coords[gridID])
                 self.ex_exact_down[gridID] = self.compute_ex_exact(self.ao_values[0,gridID,:],
                                                 self.dm_down,self.coords[gridID])
+        self.eps_x_exact_up = self.ex_exact_up/self.rho_up
+        self.eps_x_exact_down = self.ex_exact_down/self.rho_down
     def calc_Exks_post_approx(self):
         """
         Function to compute the total exchange energy of a molecule with 
