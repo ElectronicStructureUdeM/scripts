@@ -1,12 +1,10 @@
-from pyscf import gto,scf,dft,lib
 import numpy as np
-from pyscf.dft import numint
 import sys
-from compute_energies import calc_energy_Exks,calc_energy_dft
+from modelXC import ModelXC
 import re
 """
 Script to compute the atomization energies of functional/6-311+g(2d,p) for a small dataset. 
-The energies are calculated in a post-PBE way (converged densities of PBE)
+The energies are calculated in a post-PBE way, thus not self-consistent
 
 Dependencies:
     calc_E_atoms.py
@@ -16,7 +14,6 @@ Usage:
 Output:
     atomization.txt(file): molecule total energy(Ha) atomization energy (kcal/mol)
 TODO
-    Making the code more flexible to chose other basis sets.
     automatic way to check if calc_E_atoms.py was already done
     Prettier format for atomization.txt
 """
@@ -68,10 +65,11 @@ def atomization(mol,positions,spin,functional):
         if line.split()[0] == mol:
             mol_exist=True
     if mol_exist == False: 
+        post_pbe  = ModelXC(mol,positions,spin,approx='pbe,pbe')
         if functional=="EXKS":
-            E_mol =calc_energy_Exks(mol,positions,spin)
+            E_mol =post_pbe.calc_total_energy_Ex_ks()
         else:
-            E_mol=calc_energy_dft(mol,positions,spin,functional)
+            E_mol=post_pbe.calc_Etot_post_approx(functional)
         tot_E_atoms=0
         atoms = re.findall('[A-Z][^A-Z]*', mol) # to split at each uppercase using regular expression
         for atom in atoms:
@@ -83,7 +81,6 @@ def atomization(mol,positions,spin,functional):
     out.close()
 # All the geometries were optimized at the PBE/6-311+g(2d,p) level
 functional = sys.argv[1]
-lib.num_threads(1)# pySCF will only use 1 thread
 #H2
 mol="HH"
 spin=0
