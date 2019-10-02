@@ -1,6 +1,7 @@
 from pyscf import dft,gto,lib,scf
 import re
 import numpy as np
+from numba import vectorize,float64
 class ModelXC:
     def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
         """
@@ -70,6 +71,9 @@ class ModelXC:
             self.rho_down,self.dx_rho_down,self.dy_rho_down,self.dz_rho_down,self.lap_down,self.tau_down = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_down, xctype="MGGA")
         self.rho_tot = self.rho_up+self.rho_down
+        self.zeta = (self.rho_up-self.rho_down)/self.rho_tot
+        self.kf = (3.*np.pi**2*self.rho_tot)**(1./3.)
+        self.rs = (3./(4.*np.pi*self.rho_tot))**(1./3.)
     def compute_ex_exact(self,ao_value,dm,coord):
         """
         Function to compute the exact kohn sham exchange energy density
