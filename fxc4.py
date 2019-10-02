@@ -2,7 +2,6 @@ from modelXC import ModelXC
 import numpy as np
 import scipy
 from numba import vectorize, float64
-from mpi4py import MPI
 
 class fxc4(ModelXC):
     """
@@ -68,7 +67,7 @@ class fxc4(ModelXC):
             alpha:float
                 parameter of fx1
         """
-        return scipy.optimize.brentq(self.find_alpha,0,1000,args=(epsilonX,rhoRU))
+        return scipy.optimize.brentq(self.find_alpha,-1e-2,100,args=(epsilonX,rhoRU))
 
     ####for correlation
     def calc_A(self,rs,zeta):
@@ -113,8 +112,12 @@ class fxc4(ModelXC):
     def calc_exc_fxc4(self,gridID):
         alpha_up = self.calc_alpha(self.eps_x_up[gridID],self.rhoRUA[gridID])
         self.fx1_up = self.fx1
-        alpha_down = self.calc_alpha(self.eps_x_down[gridID],self.rhoRUB[gridID])
-        self.fx1_down = self.fx1
+        
+        if self.mol.nelectron==1:
+            self.fx1_down = self.fx1*0
+        else:
+            alpha_down = self.calc_alpha(self.eps_x_down[gridID],self.rhoRUB[gridID])
+            self.fx1_down = self.fx1
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx1_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx1_down*self.rhoRUB[gridID]
         #for correlation factor
@@ -128,8 +131,11 @@ class fxc4(ModelXC):
         #for exact exchange
         alpha_up = self.calc_alpha(self.eps_x_exact_up[gridID],self.rhoRUA[gridID])
         self.fx1_up = self.fx1
-        alpha_down = self.calc_alpha(self.eps_x_exact_down[gridID],self.rhoRUB[gridID])
-        self.fx1_down = self.fx1
+        if self.mol.nelectron==1:
+            self.fx1_down=self.fx1*0
+        else:
+            alpha_down = self.calc_alpha(self.eps_x_exact_down[gridID],self.rhoRUB[gridID])
+            self.fx1_down = self.fx1
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx1_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx1_down*self.rhoRUB[gridID]
         #renormalize
@@ -141,30 +147,13 @@ class fxc4(ModelXC):
         return  eps_xc*self.rho_tot[gridID]
 
     def calc_Etot_fxc4(self):
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
-        assert self.n_grid%2==0, 'oops grid not even'
-        perrank = self.n_grid//size
-        comm.Barrier()
-        summ = np.zeros(1)
         sum=0
-        for gridID in range(rank*perrank,(rank+1)*perrank):
+        for gridID in range(self.n_grid):
             sum+=self.calc_exc_fxc4(gridID)*self.weights[gridID]
-        summ[0]=sum
-        if rank == 0:
-            total = np.zeros(1)
-        else:
-            total = None
-        comm.Barrier()
-        comm.Reduce(summ, total, op=MPI.SUM, root=0)
-        if rank==0:
-            self.Exc=total[0]
-            self.Etot = self.mf.e_tot-self.approx_Exc+self.Exc
-            print(self.Etot)
+        self.Exc = sum
+        self.Etot = self.mf.e_tot-self.approx_Exc+self.Exc
+        return self.Etot
 
 
-fxc = fxc4("Ar",[[0,0,0]],0,functional='pbe,pbe')
-fxc.calc_Etot_fxc4()
 
     
