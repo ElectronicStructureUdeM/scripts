@@ -6,19 +6,16 @@ from numba import vectorize, float64
 class fxc4(ModelXC):
     """
     Simple one parameters exchange factor: fx=np.exp(-alpha*u**2)
-    where alpha is found by reproducing epsilon_x.
-    4 parameter for fc: A+Bu+Cu^2+Du^4
+    where alpha is found by reproducing epsilon_x exact.
+    4 parameter for fc: A+Bu+Cu^2
     Where A is found from on-top of lsd
     B from cusp of LSD
     C by normalising the xc hole
-    D by reproducing an energy density from an approximation
     
     """
-    def __init__(self,molecule,positions,spin,functional='pbe,pbe',approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
+    def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
         super().__init__(molecule,positions,spin,approx,basis,num_threads)
-        self.functional=functional
         self.calc_eps_xks_post_approx()#for exks
-        self.calc_eps_xc_post_approx(self.functional)#for epsx
         if self.mol.spin==0:
             self.ux,self.uwei,self.rhoRUA = np.load(self.mol_name+".npy",allow_pickle=True)
             self.rhoRUB=self.rhoRUA
@@ -35,13 +32,13 @@ class fxc4(ModelXC):
             alpha:float
                 parameter
             u:float
-                sphere radius, which could be to some power
+                sphere radius, which could be to some power (by default u**2)
         """
         return -np.exp(-alpha*u)
 
     def find_alpha(self,alpha,epsilonX,rhoRU):
         """
-        Target function to find alpha by reproducing some epsilon_x using a root finding algorithm
+        Target function to find alpha by reproducing epsilon_x ks using a root finding algorithm
         Input:
             alpha:float
                 parameter
@@ -57,7 +54,7 @@ class fxc4(ModelXC):
     
     def calc_alpha(self,epsilonX,rhoRU):
         """
-        To calculate alpha using a root finding algorithm to reproduce an exchange energy density
+        To calculate alpha using a root finding algorithm to reproduce exact exchange energy density
         input:
             epsilonX:float
                 exchange energy density to reproduce
@@ -69,14 +66,32 @@ class fxc4(ModelXC):
         """
         return scipy.optimize.brentq(self.find_alpha,-1e-2,100,args=(epsilonX,rhoRU))
 
-    ####for correlation
+    ####for correlation######################
     def calc_A(self,rs,zeta):
+        """
+        Calculate A which is used to reproduce the on-top value of rho_xc of LSD
+        
+        Input:
+            Rs:float
+                wigner radius
+            zeta:
+                spin polarisation
+        """
         mu=0.193
         nu=0.525
        #Calculate A (eq.38)
         return ((1-zeta**2)*0.5*(1.0+mu*rs)/(1.0+nu*rs+mu*nu*rs**2)-1.0)*(-2./(1.+zeta**2))
 
     def calc_B(self,rs,zeta):
+        """
+        Calculate B which is used to reproduce the cusp value of rho_xc of LSD
+        
+        Input:
+            Rs:float
+                wigner radius
+            zeta:
+                spin polarisation
+        """
         a=0.193
         b=0.525
         u=0.33825
@@ -87,46 +102,31 @@ class fxc4(ModelXC):
         return (-4.0/(3.0*np.pi*kappa))*rs*H*((1.0-zeta**2)/(zeta**2+1.0))*((1.0+a*rs)/(1.0+b*rs+a*b*rs**2))
     
     def calc_fc4(self):
-        return (self.A+self.B*self.ux_pow[1]+self.C*self.ux_pow[2]+self.D*self.ux_pow[4])
-
-    def calc_C_D(self):
-        f1 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[1])
-        f2 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[2])
-        f3 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[3])
-        f4 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[4])
-        f5 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[5])
-        f6 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[6])
-        a_data = np.array([[f4,f6],
-                          [f3,f5]])
-        b_data = np.array([-1/(4.*np.pi)-self.A*f2-self.B*f3,
-                        self.eps_xc_approx/(2.*np.pi)-self.A*f1-self.B*f2])
-        self.C,self.D = np.linalg.solve(a_data,b_data)
+        """
+        To calculate the correlation factor for each u
+        fc = A+B*u+C*u**2
+        """
+        return (self.A+self.B*self.ux_pow[1]+self.C*self.ux_pow[2])
 
     def calc_C(self):
+        """
+        TO calculate C, which is found by normalizing the exchange-correlation hole
+        to -1
+        """
         f2 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[2])
         f3 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[3])
         f4 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[4])
-        f6 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[6])
-        self.C=(-1./(4.*np.pi)-self.A*f2-self.B*f3-self.D*f6)/f4
+        self.C=(-1./(4.*np.pi)-self.A*f2-self.B*f3)/f4
     
     def calc_exc_fxc4(self,gridID):
-        alpha_up = self.calc_alpha(self.eps_x_up[gridID],self.rhoRUA[gridID])
-        self.fx1_up = self.fx1
-        
-        if self.mol.nelectron==1:
-            self.fx1_down = self.fx1*0
-        else:
-            alpha_down = self.calc_alpha(self.eps_x_down[gridID],self.rhoRUB[gridID])
-            self.fx1_down = self.fx1
-        self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx1_up*self.rhoRUA[gridID]+\
-                        1./2.*(1.-self.zeta[gridID])*self.fx1_down*self.rhoRUB[gridID]
+        """
+        To calculate exc for the model for a grid point
+        It starts by calculating A and B of the correlation factor,
+         calculates the parameters of fx, normalize the xc hole then calculate exc.
+        """
         #for correlation factor
         self.A = self.calc_A(self.rs[gridID],self.zeta[gridID])
         self.B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
-        self.exc_approx = self.eps_x_up[gridID]*self.rho_up[gridID]+self.eps_x_down[gridID]*self.rho_down[gridID]+\
-                    self.eps_c[gridID]*self.rho_tot[gridID]
-        self.eps_xc_approx = self.exc_approx/self.rho_tot[gridID]
-        self.calc_C_D()
 
         #for exact exchange
         alpha_up = self.calc_alpha(self.eps_x_exact_up[gridID],self.rhoRUA[gridID])
@@ -147,6 +147,9 @@ class fxc4(ModelXC):
         return  eps_xc*self.rho_tot[gridID]
 
     def calc_Etot_fxc4(self):
+        """
+        to calculate the total Exchange-correlation energy of the model
+        """
         sum=0
         for gridID in range(self.n_grid):
             sum+=self.calc_exc_fxc4(gridID)*self.weights[gridID]

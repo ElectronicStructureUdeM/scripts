@@ -2,6 +2,7 @@ import numpy as np
 import sys
 from modelXC import ModelXC
 import re
+from fxc4 import fxc4
 """
 Script to compute the atomization energies of functional/6-311+g(2d,p) for a small dataset. 
 The energies are calculated in a post-PBE way, thus not self-consistent
@@ -64,11 +65,15 @@ def atomization(mol,positions,spin,functional):
     for line in fl:
         if line.split()[0] == mol:
             mol_exist=True
-    if mol_exist == False: 
-        post_pbe  = ModelXC(mol,positions,spin,approx='pbe,pbe')
+    if mol_exist == False:       
         if functional=="EXKS":
+            post_pbe  = ModelXC(mol,positions,spin,approx='pbe,pbe')
             E_mol =post_pbe.calc_total_energy_Ex_ks()
+        elif functional == "fxc4":
+            fxc = fxc4(mol,positions,spin,approx='pbe,pbe')
+            E_mol = fxc.calc_Etot_fxc4()
         else:
+            post_pbe  = ModelXC(mol,positions,spin,approx='pbe,pbe')
             E_mol=post_pbe.calc_Etot_post_approx(functional)
         tot_E_atoms=0
         atoms = re.findall('[A-Z][^A-Z]*', mol) # to split at each uppercase using regular expression

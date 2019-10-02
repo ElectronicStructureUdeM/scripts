@@ -1,6 +1,7 @@
 from modelXC import ModelXC
 import numpy as np
 import sys
+from fxc4 import fxc4
 """
 Description:
     This code can be used to compute the total energies of various atoms from H to Ar
@@ -18,7 +19,8 @@ TODO:
 """
 
 #Dictionary with the atoms and it's total spin
-atoms={"H":1,"He":0,"Li":1,"Be":0,"B":1,"C":2,"N":3,
+atoms={"H":1,"He":0,"Li":1,
+        "Be":0,"B":1,"C":2,"N":3,
         "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,
         "Mg":0,"Al":1,"Si":2,"P":3,"S":2,"Cl":1,"Ar":0}
         
@@ -27,9 +29,13 @@ functional = sys.argv[1]
 f=open("E_atom.txt","w")
 f.write("Atom "+functional+"\n")
 for atom in atoms:
-    post_pbe  = ModelXC(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
     if functional=="EXKS":
+        post_pbe  = ModelXC(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
         f.write(atom +" %.8f\n"%post_pbe.calc_total_energy_Ex_ks())
+    elif functional=="fxc4":
+        fxc = fxc4(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
+        f.write(atom+" %.8f\n"%fxc.calc_Etot_fxc4())
     else:
+        post_pbe  = ModelXC(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
         f.write(atom +" %.8f\n"%post_pbe.calc_Etot_post_approx(functional))
 f.close()

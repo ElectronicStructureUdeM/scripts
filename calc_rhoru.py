@@ -134,7 +134,8 @@ def calc_rhoru(mol,mf,grids):
     else:return ux,uwei,rhoruA,rhoruB
 
 def output_rhoRU_atoms():
-    atoms={"H":1,"He":0,"Li":1,"Be":0,"B":1,"C":2,"N":3,
+    atoms={#"H":1,"He":0,"Li":1,
+            "Be":0,"B":1,"C":2,"N":3,
         "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,
         "Mg":0,"Al":1,"Si":2,"P":3,"S":2,"Cl":1,"Ar":0}
     for atom in atoms:
