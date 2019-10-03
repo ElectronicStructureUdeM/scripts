@@ -5,8 +5,8 @@ from numba import vectorize, float64
 
 class fxc4(ModelXC):
     """
-    Simple one parameters exchange factor: fx=np.exp(-alpha*u**2)
-    where alpha is found by reproducing epsilon_x exact.
+    Simple one parameters exchange factor: fx=np.exp(-gamma*u**2)
+    where gamma is found by reproducing epsilon_x exact.
     4 parameter for fc: A+Bu+Cu^2
     Where A is found from on-top of lsd
     B from cusp of LSD
@@ -24,23 +24,28 @@ class fxc4(ModelXC):
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
     
-    @vectorize([float64(float64, float64)])
-    def calc_fx1(alpha,u):
+    @vectorize([float64(float64, float64,float64,float64)])
+    def calc_fx2(alpha,gamma,u_alpha,u_gamma):
         """
-        Calculate -np(-alpha*u)
+        Calculate -np(-gamma*u)
         input:
             alpha:float
                 parameter
-            u:float
+            gamma:float
+                parameter
+            u_alpha:float
                 sphere radius, which could be to some power (by default u**2)
-        """
-        return -np.exp(-alpha*u)
+            u_gamma:float
+                sphere radius, which could be to some power (by default u**2)
 
-    def find_alpha(self,alpha,epsilonX,rhoRU):
         """
-        Target function to find alpha by reproducing epsilon_x ks using a root finding algorithm
+        return (-1+alpha*u_alpha)*np.exp(-gamma*u_gamma)
+
+    def find_gamma(self,gamma,epsilonX,rhoRU):
+        """
+        Target function to find gamma by reproducing epsilon_x ks using a root finding algorithm
         Input:
-            alpha:float
+            gamma:float
                 parameter
             epsilonX: float
                 exchange energy density to reproduce
@@ -49,22 +54,26 @@ class fxc4(ModelXC):
         return:
             0 = int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
         """
-        self.fx1 = self.calc_fx1(alpha,self.ux_pow[2])
-        return 2.*np.pi*np.einsum("i,i,i,i->",self.uwei,self.ux_pow[1],rhoRU,self.fx1)-epsilonX
+        fx2 = self.calc_fx2(0.,gamma,0.,self.ux_pow[2])
+        return 4.*np.pi*np.einsum("i,i,i,i->",self.uwei,self.ux_pow[2],rhoRU,fx2)+1
     
-    def calc_alpha(self,epsilonX,rhoRU):
+    def calc_gamma_alpha(self,epsilonX,rhoRU):
         """
-        To calculate alpha using a root finding algorithm to reproduce exact exchange energy density
+        To calculate gamma using a root finding algorithm to reproduce exact exchange energy density
         input:
             epsilonX:float
                 exchange energy density to reproduce
             rhoRU: array of float
                 spherically averaged energy density
-        Returns:
-            alpha:float
-                parameter of fx1
+        output:
+            fx:array of float
+                the exchange factor for each u
         """
-        return scipy.optimize.brentq(self.find_alpha,-1e-2,100,args=(epsilonX,rhoRU))
+        gamma= scipy.optimize.brentq(self.find_gamma,-1e-2,100,args=(epsilonX,rhoRU))
+        f1 = np.einsum("i,i,i,i->",self.ux_pow[1],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        f3 = np.einsum("i,i,i,i->",self.ux_pow[3],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        alpha = (epsilonX/(2.*np.pi)+f1)/f3
+        self.fx = self.calc_fx2(alpha,gamma,self.ux_pow[2],self.ux_pow[2])
 
     ####for correlation######################
     def calc_A(self,rs,zeta):
@@ -129,15 +138,15 @@ class fxc4(ModelXC):
         self.B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
 
         #for exact exchange
-        alpha_up = self.calc_alpha(self.eps_x_exact_up[gridID],self.rhoRUA[gridID])
-        self.fx1_up = self.fx1
+        self.calc_gamma_alpha(self.eps_x_exact_up[gridID],self.rhoRUA[gridID])
+        self.fx_up = self.fx
         if self.mol.nelectron==1:
-            self.fx1_down=self.fx1*0
+            self.fx_down=self.fx*0
         else:
-            alpha_down = self.calc_alpha(self.eps_x_exact_down[gridID],self.rhoRUB[gridID])
-            self.fx1_down = self.fx1
-        self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx1_up*self.rhoRUA[gridID]+\
-                        1./2.*(1.-self.zeta[gridID])*self.fx1_down*self.rhoRUB[gridID]
+            self.calc_gamma_alpha(self.eps_x_exact_down[gridID],self.rhoRUB[gridID])
+            self.fx_down = self.fx
+        self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
+                        1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #renormalize
         self.calc_C()
         self.fc = self.calc_fc4()
