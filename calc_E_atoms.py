@@ -1,7 +1,7 @@
 from modelXC import ModelXC
 import numpy as np
 import sys
-from fxc4 import fxc4
+from fxc import Fxc
 """
 Description:
     This code can be used to compute the total energies of various atoms from H to Ar
@@ -32,9 +32,9 @@ for atom in atoms:
     if functional=="EXKS":
         post_pbe  = ModelXC(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
         f.write(atom +" %.8f\n"%post_pbe.calc_total_energy_Ex_ks())
-    elif functional=="fxc4":
-        fxc = fxc4(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
-        f.write(atom+" %.8f\n"%fxc.calc_Etot_fxc4())
+    elif functional=="fxc":
+        fxc = Fxc(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
+        f.write(atom+" %.8f\n"%fxc.calc_Etot_fxc())
     else:
         post_pbe  = ModelXC(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
         f.write(atom +" %.8f\n"%post_pbe.calc_Etot_post_approx(functional))

@@ -3,7 +3,7 @@ import numpy as np
 import scipy
 from numba import vectorize, float64
 
-class fxc4(ModelXC):
+class Fxc(ModelXC):
     """
     Simple one parameters exchange factor: fx=np.exp(-gamma*u**2)
     where gamma is found by reproducing epsilon_x exact.
@@ -17,10 +17,12 @@ class fxc4(ModelXC):
         super().__init__(molecule,positions,spin,approx,basis,num_threads)
         self.calc_eps_xks_post_approx()#for exks
         if self.mol.spin==0:
-            self.ux,self.uwei,self.rhoRUA = np.load(self.mol_name+".npy",allow_pickle=True)
+            self.ux,self.uwei,self.rhoRUA = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/"+\
+                                                        self.mol_name+".npy",allow_pickle=True)
             self.rhoRUB=self.rhoRUA
         else:
-            self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load(self.mol_name+".npy",allow_pickle=True)
+            self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/"+\
+                                                                self.mol_name+".npy",allow_pickle=True)
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
     
@@ -127,7 +129,7 @@ class fxc4(ModelXC):
         f4 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[4])
         self.C=(-1./(4.*np.pi)-self.A*f2-self.B*f3)/f4
     
-    def calc_exc_fxc4(self,gridID):
+    def calc_exc_fxc(self,gridID):
         """
         To calculate exc for the model for a grid point
         It starts by calculating A and B of the correlation factor,
@@ -155,13 +157,13 @@ class fxc4(ModelXC):
         eps_xc = 2.*np.pi*np.einsum("i,i,i,i->",self.fc,self.rho_x,self.ux_pow[1],self.uwei)
         return  eps_xc*self.rho_tot[gridID]
 
-    def calc_Etot_fxc4(self):
+    def calc_Etot_fxc(self):
         """
         to calculate the total Exchange-correlation energy of the model
         """
         sum=0
         for gridID in range(self.n_grid):
-            sum+=self.calc_exc_fxc4(gridID)*self.weights[gridID]
+            sum+=self.calc_exc_fxc(gridID)*self.weights[gridID]
         self.Exc = sum
         self.Etot = self.mf.e_tot-self.approx_Exc+self.Exc
         return self.Etot
