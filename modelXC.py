@@ -22,7 +22,7 @@ class ModelXC:
         lib.num_threads(num_threads)
         self.approx=approx
         self.mol = gto.Mole()
-        if ASE = True:
+        if ASE == True:
           atoms = re.findall('[A-Z][^A-Z]*', molecule)
           molecule =[]
           nAtom=0
