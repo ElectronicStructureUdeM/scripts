@@ -14,26 +14,22 @@ def brhole(u,a,b,c):
 def brhpot(u,a,b,c):
     return u*brhole(u,a,b,c)
 
-def brhparam(rhoa,epsx):
-     grad = rhoa[1]**2 + rhoa[2]**2 + rhoa[3]**2
-     rgrad = grad/rhoa[0]
-     D = 2*rhoa[5] - rgrad/4
-     Q = (rhoa[4] -2*D)/6
-     #print(rhoa[4,iG])
-     #print(D)
-     rhor = rhoa[0]
-     Qp = Q/(rhor**2) * epsx
-     sol = scipy.optimize.root_scalar(findxbr, args=(Qp), xtol=1e-16, bracket=[1e-10,100] , method='brentq')
-     sol = sol.root
-     #print(sol)
+def brhparam(Q,rho,epsx):
+    size = np.shape(Q)[0]
+    a = np.zeros(size)
+    b = np.zeros(size)
+    c = np.zeros(size)
+    n = np.zeros(size)
+    for gridID in range(size):
+        Qp = Q[gridID]/(rho[gridID]**2) * epsx[gridID]
+        sol = scipy.optimize.root_scalar(findxbr, args=(Qp), xtol=1e-16, bracket=[1e-10,100] , method='brentq')
+        sol = sol.root
 
-     a = 6*Q/rhor * sol/(sol-2)
-     #print(a)
-     a = np.sqrt(a)
-     b = sol/a
-     c = rhor*np.exp(sol)
-     n = 8*np.pi*c/(a**3)
-   #print(n)
-     if n>2: n=2
-     return a,b,c,n
-
+        a[gridID] = 6*Q[gridID]/rho[gridID] * sol/(sol-2)
+        a[gridID] = np.sqrt(a[gridID])
+        b[gridID] = sol/a[gridID]
+        c[gridID] = rho[gridID]*np.exp(sol)
+        n[gridID] = 8*np.pi*c[gridID]/(a[gridID]**3)
+        if n[gridID]>2: n[gridID]=2
+        
+    return a,b,c,n
