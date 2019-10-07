@@ -26,26 +26,34 @@ class Fxc(ModelXC):
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
     
-    @vectorize([float64(float64, float64,float64,float64)])
-    def calc_fx2(alpha,gamma,u_alpha,u_gamma):
+    @vectorize([float64(float64,float64,float64, float64,float64,float64,float64,float64)])
+    def calc_fx(alpha,beta,chi,gamma,u_alpha,u_beta,u_chi,u_gamma):
         """
-        Calculate -np(-gamma*u)
+        Calculate (-1+alpha*u_alpha+beta*u_beta)*exp(-gamma*u_gamma)
         input:
             alpha:float
+                parameter
+            beta:float
+                parameter
+            chi:float
                 parameter
             gamma:float
                 parameter
             u_alpha:float
-                sphere radius, which could be to some power (by default u**2)
+                sphere radius, which could be to some power (usually u**2)
+            u_beta:float
+                sphere radius, which could be to some power (usually u**4)
+            u_chi:float
+                sphere radius, which could be to some power (usually u**6)            
             u_gamma:float
-                sphere radius, which could be to some power (by default u**2)
+                sphere radius, which could be to some power (usually u**2)
 
         """
-        return (-1+alpha*u_alpha)*np.exp(-gamma*u_gamma)
+        return (-1.+alpha*u_alpha+beta*u_beta+chi*u_chi)*np.exp(-gamma*u_gamma)
 
     def find_gamma(self,gamma,epsilonX,rhoRU):
         """
-        Target function to find gamma by reproducing epsilon_x ks using a root finding algorithm
+        Target function to find gamma by reproducing epsilon_x ks or norm using a root finding algorithm
         Input:
             gamma:float
                 parameter
@@ -56,26 +64,45 @@ class Fxc(ModelXC):
         return:
             0 = int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
         """
-        fx2 = self.calc_fx2(0.,gamma,0.,self.ux_pow[2])
-        return 4.*np.pi*np.einsum("i,i,i,i->",self.uwei,self.ux_pow[2],rhoRU,fx2)+1
+        fx2 = self.calc_fx(0.,0.,0.,gamma,0.,0.,0.,self.ux_pow[2])
+        return 2.*np.pi*np.einsum("i,i,i,i->",self.uwei,self.ux_pow[1],rhoRU,fx2)-epsilonX
     
-    def calc_gamma_alpha(self,epsilonX,rhoRU):
+    def calc_gamma_alpha_beta_chi(self,epsilonX,rhoRU,Q,lap,rho):
         """
         To calculate gamma using a root finding algorithm to reproduce exact exchange energy density
+        or normalisation
         input:
             epsilonX:float
                 exchange energy density to reproduce
             rhoRU: array of float
                 spherically averaged energy density
+            Q: float
+                -curvature
+            lap:float
+                laplacian of the density
+            rho:float
+                density
         output:
             fx:array of float
                 the exchange factor for each u
         """
         gamma= scipy.optimize.brentq(self.find_gamma,-1e-2,100,args=(epsilonX,rhoRU))
+        alpha = (-Q+(1./6.)*lap)/(4*rho)-gamma
         f1 = np.einsum("i,i,i,i->",self.ux_pow[1],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        f2 = np.einsum("i,i,i,i->",self.ux_pow[2],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
         f3 = np.einsum("i,i,i,i->",self.ux_pow[3],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        alpha = (epsilonX/(2.*np.pi)+f1)/f3
-        self.fx = self.calc_fx2(alpha,gamma,self.ux_pow[2],self.ux_pow[2])
+        f4 = np.einsum("i,i,i,i->",self.ux_pow[4],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        f5 = np.einsum("i,i,i,i->",self.ux_pow[5],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        f6 = np.einsum("i,i,i,i->",self.ux_pow[6],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        f7 = np.einsum("i,i,i,i->",self.ux_pow[7],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        f8 = np.einsum("i,i,i,i->",self.ux_pow[8],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))        
+        a_data = np.array([[f6,f8],
+                          [f5,f7]])
+        b_data = np.array([-1./(4.*np.pi)+f2-alpha*f4,
+                        epsilonX/(2.*np.pi)+f1-alpha*f3])
+        beta,chi = np.linalg.solve(a_data,b_data)
+        return self.calc_fx(alpha,beta,chi,gamma,self.ux_pow[2],self.ux_pow[4],
+                                    self.ux_pow[6],self.ux_pow[2])
 
     ####for correlation######################
     def calc_A(self,rs,zeta):
@@ -140,13 +167,13 @@ class Fxc(ModelXC):
         self.B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
 
         #for exact exchange
-        self.calc_gamma_alpha(self.eps_x_exact_up[gridID],self.rhoRUA[gridID])
-        self.fx_up = self.fx
+        self.fx_up=self.calc_gamma_alpha_beta_chi(self.eps_x_exact_up[gridID],self.rhoRUA[gridID],
+                                self.Q_up[gridID],self.lap_up[gridID],self.rho_up[gridID])
         if self.mol.nelectron==1:
-            self.fx_down=self.fx*0
+            self.fx_down=self.fx_up*0
         else:
-            self.calc_gamma_alpha(self.eps_x_exact_down[gridID],self.rhoRUB[gridID])
-            self.fx_down = self.fx
+            self.fx_down = self.calc_gamma_alpha_beta_chi(self.eps_x_exact_down[gridID],self.rhoRUB[gridID],
+                                        self.Q_down[gridID],self.lap_down[gridID],self.rho_down[gridID])
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #renormalize
