@@ -1,8 +1,7 @@
 def myrmp2(mf,mol):
     import numpy
     from pyscf import ao2mo
-    # As UHF objects, mo_energy, mo_occ, mo_coeff are two-item lists
-    # (the first item for alpha spin, the second for beta spin).
+
     mo_energy = mf.mo_energy
     mo_occ = mf.mo_occ
     mo_coeff = mf.mo_coeff
@@ -15,17 +14,13 @@ def myrmp2(mf,mol):
     noa = sum(mo_occ>0)
     nva = sum(mo_occ==0)
     eri = ao2mo.general(mf.mol, (o,v,o,v)).reshape(no,nv,no,nv)
-#    eri2=eri
-#    eri[:noa,nva:] = eri[noa:,:nva] = eri[:,:,:noa,nva:] = eri[:,:,noa:,:nva] = 0
+
     g = 4*eri - 2*eri.transpose(0,3,2,1)
     eov = eo.reshape(-1,1) - ev.reshape(-1)
     de = 1/(eov.reshape(-1,1) + eov.reshape(-1)).reshape(g.shape)
     emp2 = 0.5 * numpy.einsum('iajb,iajb,iajb->', g, eri, de)
 
-    g = numpy.einsum('iajb,iajb->iajb', g, de)
-#    gamma = gamma - gamma.transpose(0,3,2,1)
-#    emp2p = 0.5 * numpy.einsum('iajb,iajb->', gamma, eri)
-    GV =  g
+    GV = numpy.einsum('iajb,iajb->iajb', g, de)
     
     GV = numpy.einsum('ab,bcde->acde', o, GV)    # i
     GV = numpy.einsum('abcd,eb->aecd', GV, v)    # j
@@ -33,7 +28,6 @@ def myrmp2(mf,mol):
     GV = numpy.einsum('abcd,ed->abce', GV, v)    # l 
 
 #    eri2 = mol.intor('int2e')
-    #print(eri2.shape)
 #    EMP2 = 0.5*numpy.einsum('ijkl,ijkl->',gamma,eri2)
     
     print(str(emp2))
@@ -44,8 +38,7 @@ def myrmp2(mf,mol):
 def oppspin(mf,mol,case):
     import numpy
     from pyscf import ao2mo
-    # As UHF objects, mo_energy, mo_occ, mo_coeff are two-item lists
-    # (the first item for alpha spin, the second for beta spin).
+
     mo_energy = mf.mo_energy
     mo_occ = mf.mo_occ
     mo_coeff = mf.mo_coeff
@@ -96,19 +89,16 @@ def oppspin(mf,mol,case):
     GV = numpy.einsum('abcd,ed->abce', GV, v2)    # l 
 
 #    eri2 = mol.intor('int2e')
-    #print(eri2.shape)
 #    EMP2 = 0.5*numpy.einsum('ijkl,ijkl->',gamma,eri2)
     
     print(str(emp2))
-#    print(str(emp2p))
 #    print(str(EMP2))
     return GV
 
 def samespin(mf,mol,case):
     import numpy
     from pyscf import ao2mo
-    # As UHF objects, mo_energy, mo_occ, mo_coeff are two-item lists
-    # (the first item for alpha spin, the second for beta spin).
+    
     mo_energy = mf.mo_energy
     mo_occ = mf.mo_occ
     mo_coeff = mf.mo_coeff
@@ -117,8 +107,6 @@ def samespin(mf,mol,case):
        s=0
     if case ==1:
        s=1
-
-#   Calculate alpha-beta constribution 
 
     o = mo_coeff[s][:,mo_occ[s]>0] 
     v = mo_coeff[s][:,mo_occ[s]==0]
@@ -153,8 +141,6 @@ def samespin(mf,mol,case):
     #print(eri2.shape)
 #    EMP2 = 0.5*numpy.einsum('ijkl,ijkl->',gamma,eri2)
     
-    print(str(emp2))
-    print(str(emp2p))
 #    print(str(EMP2))
     return GV
 
