@@ -56,8 +56,7 @@ def oppspin(mf,mol,case):
     v1 = mo_coeff[s1][:,mo_occ[s1]==0]
     o2 = mo_coeff[s2][:,mo_occ[s2]>0] 
     v2 = mo_coeff[s2][:,mo_occ[s2]==0]
-
-
+    
     eo1 = mo_energy[s1][mo_occ[s1]>0]
     ev1 = mo_energy[s1][mo_occ[s1]==0]
     eo2 = mo_energy[s2][mo_occ[s2]>0]
@@ -78,10 +77,9 @@ def oppspin(mf,mol,case):
     de = 1/(eov1.reshape(-1,1) + eov2.reshape(-1)).reshape(eri.shape)
     emp2 =  numpy.einsum('iajb,iajb,iajb->', eri, eri, de)
 
-    gamma = numpy.einsum('iajb,iajb->iajb', g, de)
+    GV = numpy.einsum('iajb,iajb->iajb', g, de)
 #    gamma = gamma - gamma.transpose(0,3,2,1)
 #    emp2p = 0.5 * numpy.einsum('iajb,iajb->', gamma, eri)
-    GV =  gamma
     
     GV = numpy.einsum('ab,bcde->acde', o1, GV)    # i
     GV = numpy.einsum('abcd,eb->aecd', GV, v1)    # j
@@ -110,7 +108,6 @@ def samespin(mf,mol,case):
 
     o = mo_coeff[s][:,mo_occ[s]>0] 
     v = mo_coeff[s][:,mo_occ[s]==0]
-
 
     eo = mo_energy[s][mo_occ[s]>0]
     ev = mo_energy[s][mo_occ[s]==0]
