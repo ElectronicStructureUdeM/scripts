@@ -11,51 +11,9 @@ atoms={"H":1,"He":0,"Li":1,
         "Mg":0,"Al":1,"Si":2,"P":3,"S":2,"Cl":1,
         "Ar":0}
 
-def calc_E_EXKS(atom,positions,spin):
+def calc_E(atom,positions,spin,functional):
     """
-    To calculate the total energies using exact KS exchange 
-    with converged pbe densities
-    Input:
-        atom:string
-            atomic symbol
-        positions:array
-            positions of the atom
-        spin:int
-            the spin of the atom
-    Return:
-        model_dict:dict
-            atom_name:energy
-    """
-    post_pbe  = ModelXC(atom,positions,atoms[atom],approx='pbe,pbe')
-    E=post_pbe.calc_total_energy_Ex_ks()
-    model_dict = {atom:E}
-    print(model_dict)
-    return model_dict
-
-def calc_E_fxc(atom,positions,spin):
-    """
-    To calculate the total energies using fxc
-    with converged pbe densities
-    Input:
-        atom:string
-            atomic symbol
-        positions:array
-            positions of the atom
-        spin:int
-            the spin of the atom
-    Return:
-        model_dict:dict
-            atom_name:energy
-    """
-    fxc = Fxc(atom,positions,atoms[atom],approx='pbe,pbe')
-    E = fxc.calc_Etot_fxc()
-    model_dict = {atom:E}
-    print(model_dict)
-    return model_dict
-
-def calc_E_postpbe(atom,positions,spin,functional):
-    """
-    To calculate the total energies a functional implemented in pyscf
+    To calculate the total energies a functional implemented in pyscf or our model
     with converged pbe densities
     Input:
         atom:string
@@ -65,13 +23,20 @@ def calc_E_postpbe(atom,positions,spin,functional):
         spin:int
             the spin of the atom
         functional:string
-            functional name in pyscf format
+            functional name 
     Return:
         model_dict:dict
             atom_name:energy
     """
-    post_pbe  = ModelXC(atom,positions,atoms[atom],approx='pbe,pbe')
-    E=post_pbe.calc_Etot_post_approx(functional)
+    if functional == "EXKS":
+        post_pbe  = ModelXC(atom,positions,atoms[atom],approx='pbe,pbe')
+        E=post_pbe.calc_total_energy_Ex_ks()
+    elif functional == "fxc":
+        fxc = Fxc(atom,positions,atoms[atom],approx='pbe,pbe')
+        E = fxc.calc_Etot_fxc()
+    else:
+        post_pbe  = ModelXC(atom,positions,atoms[atom],approx='pbe,pbe')
+        E=post_pbe.calc_Etot_post_approx(functional)
     model_dict = {atom:E}
     print(model_dict)
     return model_dict
@@ -81,12 +46,7 @@ functional = sys.argv[2]
 pool = mp.Pool(int(num_proc))
 
 #Calculate for the models
-if functional=="EXKS":
-    results = pool.map(lambda atom:calc_E_EXKS(atom,[[0,0,0]],atoms[atom]),[atom for atom in atoms])
-elif functional == "fxc":
-    results = pool.map(lambda atom:calc_E_fxc(atom,[[0,0,0]],atoms[atom]),[atom for atom in atoms])
-else:
-    results = pool.map(lambda atom:calc_E_postpbe(atom,[[0,0,0]],atoms[atom],functional),
+results = pool.map(lambda atom:calc_E(atom,[[0,0,0]],atoms[atom],functional),
                                                     [atom for atom in atoms])
 
 #to convert the list of dictionaries to a dictionary
