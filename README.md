@@ -7,3 +7,4 @@ Scripts to compute the total energy of atoms from H to Ar using converged PBE de
 
 # TODO
 * Add the exchange-correlation factor
+* Add brx and rho(r,u) to the class
