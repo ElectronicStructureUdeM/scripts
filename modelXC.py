@@ -107,10 +107,7 @@ class ModelXC:
         else:
             self.br_a_down,self.br_b_down,self.br_c_down,self.br_n_down = brhparam(self.Q_down,
                                                                         self.rho_down,self.eps_x_exact_down)
-<<<<<<< HEAD
-=======
         
->>>>>>> 9884cd62de29bbae5a5cae2956e05da752d971d4
     def compute_ex_exact(self,ao_value,dm,coord):
         """
         Function to compute the exact kohn sham exchange energy density
