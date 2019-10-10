@@ -16,7 +16,7 @@ from BRx import *
 #mol.atoms = molecule
 #model = ModelXC(molecule, None, 1, ASE = False, approx='PBE0',basis = 'ccpvtz')
 
-def Rodrigo(model):
+def RodrigoAC(model):
 
     ex_up = np.zeros((model.n_grid))
     ex_down = np.zeros((model.n_grid))
@@ -48,11 +48,6 @@ def Rodrigo(model):
             rs = (3.0/(4.0*np.pi*rhot))**(1/3.0)
     
     return ex_up,ex_down, ec
-
-def Etot_Rodrigo(model):
-       Emod = CF3mod(model)
-       Etot  =model.mf.e_tot - model .approx_Exc + Emod
-       return Etot
 
 
 
