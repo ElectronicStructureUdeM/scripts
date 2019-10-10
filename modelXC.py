@@ -46,7 +46,12 @@ class ModelXC:
         self.mf.xc=self.approx
         self.mf.kernel()
         self.approx_Exc = self.mf.get_veff().exc
-
+        if (mol.spin==0):
+            self.NMOA = np.count_nonzero(self.mf.mo_occ)
+            self.NMOB=self.NMOA
+        else:
+            self.NMOA = np.count_nonzero(self.mf.mo_occ[0])
+            self.NMOB = np.count_nonzero(self.mf.mo_occ[1])
         #for stuff related to grid
         self.coords = self.mf.grids.coords
         self.weights = self.mf.grids.weights
