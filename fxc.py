@@ -3,6 +3,7 @@ import numpy as np
 import scipy
 from numba import vectorize, float64
 import matplotlib.pyplot as plt
+from scipy import integrate
 class Fxc(ModelXC):
     """
     Simple one parameters exchange factor: fx=np.exp(-gamma*u**2)
@@ -17,14 +18,17 @@ class Fxc(ModelXC):
         super().__init__(molecule,positions,spin,approx,basis,num_threads)
         self.calc_eps_xks_post_approx()#for exks
         if self.mol.spin==0:
-            self.ux,self.uwei,self.rhoRUA = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu50/2500/"+\
+            self.ux,self.uwei,self.rhoRUA = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/5000/"+\
                                                         self.mol_name+".npy",allow_pickle=True)
             self.rhoRUB=self.rhoRUA
         else:
-            self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu50/2500/"+\
+            self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/5000/"+\
                                                                 self.mol_name+".npy",allow_pickle=True)
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
+        print(4.*np.pi*integrate.simps(self.ux_pow[2]*self.rhoRUA[5],x=self.ux_pow[1],even="first"))  
+        print(4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rhoRUA[5]))                                          
+
     
     @vectorize([float64(float64,float64,float64, float64,float64,float64,float64,float64)])
     def calc_fx(alpha,beta,chi,gamma,u_alpha,u_beta,u_chi,u_gamma):
@@ -65,7 +69,7 @@ class Fxc(ModelXC):
             0 = int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
         """
         fx2 = self.calc_fx(0.,0.,0.,gamma,0.,0.,0.,self.ux_pow[2])
-        return 2.*np.pi*np.einsum("i,i,i,i->",self.uwei,self.ux_pow[1],rhoRU,fx2)-epsilonX
+        return 2.*np.pi*integrate.simps(self.ux_pow[1]*rhoRU*fx2,x=self.ux_pow[1],even="first")-epsilonX
 
     def find_gamma_norm(self,gamma,norm,rhoRU):
         """
@@ -81,7 +85,7 @@ class Fxc(ModelXC):
             0 = int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
         """
         fx2 = self.calc_fx(0.,0.,0.,gamma,0.,0.,0.,self.ux_pow[2])
-        return 4.*np.pi*np.einsum("i,i,i,i->",self.uwei,self.ux_pow[2],rhoRU,fx2)+norm
+        return 4.*np.pi*integrate.simps(self.ux_pow[2]*rhoRU*fx2,x=self.ux_pow[1],even="first")+norm
 
     def calc_gamma_alpha_beta_chi(self,rhoRU,Q,lap,rho,epsilonX=None,norm=None,):
         """
@@ -108,22 +112,7 @@ class Fxc(ModelXC):
             gamma= scipy.optimize.brentq(self.find_gamma_epsx,-1e-2,100,args=(epsilonX,rhoRU))
         else:
             exit("wut")
-        #alpha = (-Q+(1./6.)*lap)/(4*rho)-gamma
-        #f1 = np.einsum("i,i,i,i->",self.ux_pow[1],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        #f2 = np.einsum("i,i,i,i->",self.ux_pow[2],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        #f3 = np.einsum("i,i,i,i->",self.ux_pow[3],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        #f4 = np.einsum("i,i,i,i->",self.ux_pow[4],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        #f5 = np.einsum("i,i,i,i->",self.ux_pow[5],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        #f6 = np.einsum("i,i,i,i->",self.ux_pow[6],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        #f7 = np.einsum("i,i,i,i->",self.ux_pow[7],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        #f8 = np.einsum("i,i,i,i->",self.ux_pow[8],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))        
-        #a_data = np.array([[f6,f8],
-        #                  [f5,f7]])
-        #b_data = np.array([-1./(4.*np.pi)+f2-alpha*f4,
-        #                epsilonX/(2.*np.pi)+f1-alpha*f3])
-        #beta,chi = np.linalg.solve(a_data,b_data)
-        #return self.calc_fx(alpha,beta,chi,gamma,self.ux_pow[2],self.ux_pow[4],
-        #                            self.ux_pow[6],self.ux_pow[2])
+
         return self.calc_fx(0.,0.,0.,gamma,0.,0.,0.,self.ux_pow[2])
 
     ####for correlation######################
@@ -173,9 +162,9 @@ class Fxc(ModelXC):
         TO calculate C, which is found by normalizing the exchange-correlation hole
         to -1
         """
-        f2 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[2])
-        f3 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[3])
-        f4 = np.einsum("i,i,i->",self.rho_x,self.uwei,self.ux_pow[4])
+        f2 = integrate.simps(self.ux_pow[2]*self.rho_x,x=self.ux_pow[1],even="first")
+        f3 = integrate.simps(self.ux_pow[3]*self.rho_x,x=self.ux_pow[1],even="first")
+        f4 = integrate.simps(self.ux_pow[4]*self.rho_x,x=self.ux_pow[1],even="first")
         self.C=(-1./(4.*np.pi)-self.A*f2-self.B*f3)/f4
     
     def calc_exc_fxc(self,gridID):
@@ -205,7 +194,8 @@ class Fxc(ModelXC):
         self.fc = self.calc_fc4()
         
         #to calculate energy
-        eps_xc = 2.*np.pi*np.einsum("i,i,i,i->",self.fc,self.rho_x,self.ux_pow[1],self.uwei)
+        eps_xc = 2.*np.pi*integrate.simps(self.ux_pow[1]*self.fc*self.rho_x,
+                                            x=self.ux_pow[1],even="first")
         return  eps_xc*self.rho_tot[gridID]
 
     def calc_Etot_fxc(self):
