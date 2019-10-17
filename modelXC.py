@@ -46,7 +46,7 @@ class ModelXC:
         self.mf.xc=self.approx
         self.mf.kernel()
         self.approx_Exc = self.mf.get_veff().exc
-        if (mol.spin==0):
+        if (self.mol.spin==0):
             self.NMOA = np.count_nonzero(self.mf.mo_occ)
             self.NMOB=self.NMOA
         else:

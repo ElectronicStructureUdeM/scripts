@@ -4,6 +4,7 @@ import scipy
 from numba import vectorize, float64
 import matplotlib.pyplot as plt
 from scipy import integrate
+import h5py
 class Fxc(ModelXC):
     """
     Simple one parameters exchange factor: fx=np.exp(-gamma*u**2)
@@ -17,13 +18,19 @@ class Fxc(ModelXC):
     def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
         super().__init__(molecule,positions,spin,approx,basis,num_threads)
         self.calc_eps_xks_post_approx()#for exks
+        f = h5py.File("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+self.mol_name+".h5",'r')
+        self.ux = np.array(f.get('ux'))
+        self.uwei = np.array(f.get('uwei'))
+        self.rhoRUA = np.array(f.get('rhoRUA'))
         if self.mol.spin==0:
-            self.ux,self.uwei,self.rhoRUA = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/5000/"+\
-                                                        self.mol_name+".npy",allow_pickle=True)
+            #self.ux,self.uwei,self.rhoRUA = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+\
+            #                                            self.mol_name+".npy",allow_pickle=True)
             self.rhoRUB=self.rhoRUA
         else:
-            self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/5000/"+\
-                                                                self.mol_name+".npy",allow_pickle=True)
+            #self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+\
+            #       self.mol_name+".npy",allow_pickle=True)
+            self.rhoRUB = np.array(f.get('rhoRUB'))
+        f.close()                                             
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
         print(4.*np.pi*integrate.simps(self.ux_pow[2]*self.rhoRUA[5],x=self.ux_pow[1],even="first"))  
@@ -69,7 +76,8 @@ class Fxc(ModelXC):
             0 = int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
         """
         fx2 = self.calc_fx(0.,0.,0.,gamma,0.,0.,0.,self.ux_pow[2])
-        return 2.*np.pi*integrate.simps(self.ux_pow[1]*rhoRU*fx2,x=self.ux_pow[1],even="first")-epsilonX
+        #return 2.*np.pi*integrate.simps(self.ux_pow[1]*rhoRU*fx2,x=self.ux_pow[1],even="first")-epsilonX
+        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx2*rhoRU)-epsilonX
 
     def find_gamma_norm(self,gamma,norm,rhoRU):
         """
@@ -85,7 +93,8 @@ class Fxc(ModelXC):
             0 = int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
         """
         fx2 = self.calc_fx(0.,0.,0.,gamma,0.,0.,0.,self.ux_pow[2])
-        return 4.*np.pi*integrate.simps(self.ux_pow[2]*rhoRU*fx2,x=self.ux_pow[1],even="first")+norm
+        #return 4.*np.pi*integrate.simps(self.ux_pow[2]*rhoRU*fx2,x=self.ux_pow[1],even="first")+norm
+        return 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],rhoRU)+norm
 
     def calc_gamma_alpha_beta_chi(self,rhoRU,Q,lap,rho,epsilonX=None,norm=None,):
         """
@@ -162,9 +171,13 @@ class Fxc(ModelXC):
         TO calculate C, which is found by normalizing the exchange-correlation hole
         to -1
         """
-        f2 = integrate.simps(self.ux_pow[2]*self.rho_x,x=self.ux_pow[1],even="first")
-        f3 = integrate.simps(self.ux_pow[3]*self.rho_x,x=self.ux_pow[1],even="first")
-        f4 = integrate.simps(self.ux_pow[4]*self.rho_x,x=self.ux_pow[1],even="first")
+        
+        f2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
+        f3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
+        f4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
+        #f2 = integrate.simps(self.ux_pow[2]*self.rho_x,x=self.ux_pow[1],even="first")
+        #f3 = integrate.simps(self.ux_pow[3]*self.rho_x,x=self.ux_pow[1],even="first")
+        #f4 = integrate.simps(self.ux_pow[4]*self.rho_x,x=self.ux_pow[1],even="first")
         self.C=(-1./(4.*np.pi)-self.A*f2-self.B*f3)/f4
     
     def calc_exc_fxc(self,gridID):
@@ -194,8 +207,9 @@ class Fxc(ModelXC):
         self.fc = self.calc_fc4()
         
         #to calculate energy
-        eps_xc = 2.*np.pi*integrate.simps(self.ux_pow[1]*self.fc*self.rho_x,
-                                            x=self.ux_pow[1],even="first")
+        #eps_xc = 2.*np.pi*integrate.simps(self.ux_pow[1]*self.fc*self.rho_x,
+        #                                    x=self.ux_pow[1],even="first")
+        eps_xc = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.fc*self.rho_x)
         return  eps_xc*self.rho_tot[gridID]
 
     def calc_Etot_fxc(self):
