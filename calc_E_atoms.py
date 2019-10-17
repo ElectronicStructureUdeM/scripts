@@ -21,15 +21,26 @@ TODO:
 atoms={"H":1,"He":0,"Li":1,"Be":0,"B":1,"C":2,"N":3,
         "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,
         "Mg":0,"Al":1,"Si":2,"P":3,"S":2,"Cl":1,"Ar":0}
-        
-functional = sys.argv[1]
-#file stuff
-f=open("E_atom.txt","w")
-f.write("Atom "+functional+"\n")
-for atom in atoms:
-    post_pbe  = ModelXC(atom,[[0,0,0]],atoms[atom],approx='pbe,pbe')
-    if functional=="EXKS":
-        f.write(atom +" %.8f\n"%post_pbe.calc_total_energy_Ex_ks())
-    else:
-        f.write(atom +" %.8f\n"%post_pbe.calc_Etot_post_approx(functional))
-f.close()
+
+def main():
+    if len(sys.argv) < 2:
+        print('Usage: python calc_E_atom.py functional')
+        print('i.e. python calc_E_atom.py PBE')
+        return
+
+    functional = sys.argv[1]
+
+    #file stuff
+    f = open("E_atom.txt","w")
+    f.write("Atom " + functional + "\n")
+
+    for atom in atoms:
+        post_pbe  = ModelXC(atom, [[0,0,0]], atoms[atom], approx = 'pbe,pbe')
+        if functional == "EXKS":
+            f.write(atom +" %.8f\n" % post_pbe.calc_total_energy_Ex_ks())
+        else:
+            f.write(atom +" %.8f\n" % post_pbe.calc_Etot_post_approx(functional))
+    f.close()
+
+if __name__ == "__main__":
+    main()

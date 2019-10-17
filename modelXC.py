@@ -1,8 +1,9 @@
 from pyscf import dft,gto,lib,scf
 import re
 import numpy as np
+
 class ModelXC:
-    def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1, ASE=True):
+    def __init__(self, molecule, positions, spin, approx='pbe,pbe', basis='6-311+g2dp.nw', num_threads = 1, ASE = True):
         """
         In the init, the pyscf Mole object and scf.ks object will be created
         Input:
@@ -20,57 +21,73 @@ class ModelXC:
                 the number of threads for pyscf
         """
         lib.num_threads(num_threads)
-        self.approx=approx
+        self.approx = approx
         self.mol = gto.Mole()
+
+        self.Exc_post_approx        = 0.0
+
         if ASE == True:
           atoms = re.findall('[A-Z][^A-Z]*', molecule)
-          molecule =[]
-          nAtom=0
+          molecule = []
+          nAtom = 0
           for atom in atoms:
             atom_pos = positions[nAtom]
-            molecule.append([atom,(atom_pos[0],atom_pos[1],atom_pos[2])])
-            nAtom=nAtom+1
-            
-        self.mol.atom=molecule
-        self.mol.verbose=0
-        self.mol.spin=spin
-        self.mol.basis = basis # downloaded from BSE
-        self.mol.cart=True
+            molecule.append([atom, (atom_pos[0], atom_pos[1], atom_pos[2])])
+            nAtom = nAtom + 1
+        
+        # Initialize the molecule
+        self.mol.atom       = molecule
+        self.mol.verbose    = 0
+        self.mol.spin       = spin
+        self.mol.basis      = basis # downloaded from BSE
+        self.mol.cart       = True
         self.mol.build()
-        self.mf = scf.KS(self.mol)
-        self.mf.small_rho_cutoff = 1e-12
-        self.mf.grids.radi_method=dft.radi.delley
-        self.mf.xc=self.approx
+        
+        # Initialize mean-field methods
+        self.mf                     = scf.KS(self.mol)
+        self.mf.small_rho_cutoff    = 1e-12
+        self.mf.grids.radi_method   = dft.radi.delley
+        self.mf.xc                  = self.approx
         self.mf.kernel()
+
         self.approx_Exc = self.mf.get_veff().exc
 
-        #for stuff related to grid
-        self.coords = self.mf.grids.coords
-        self.weights = self.mf.grids.weights
-        self.n_grid = np.shape(self.coords)[0]
-        self.ao_values = dft.numint.eval_ao(self.mol, self.coords, deriv=2) #deriv=2, since we get every info(tau,lap,etc)
-        if self.mol.spin==0:
-            self.dm_up = self.mf.make_rdm1(mo_occ=self.mf.mo_occ/2)
-            self.dm_down = self.dm_up
-            self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
+        # Set the grid
+        self.coords     = self.mf.grids.coords
+        self.weights    = self.mf.grids.weights
+        self.n_grid     = np.shape(self.coords)[0]
+        self.ao_values  = dft.numint.eval_ao(self.mol, self.coords, deriv = 2) #deriv=2, since we get every info(tau,lap,etc)
+
+        if self.mol.spin == 0:
+            # Initialize 1-e Density Matrices
+            self.dm_up      = self.mf.make_rdm1(mo_occ = self.mf.mo_occ / 2)
+            self.dm_down    = self.dm_up
+
+            self.rho_up, self.dx_rho_up, self.dy_rho_up, self.dz_rho_up, self.lap_up, self.tau_up = \
                                     dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
-            self.rho_down=self.rho_up
-            self.dx_rho_down=self.dx_rho_up
-            self.dy_rho_down=self.dy_rho_up
-            self.dz_rho_down=self.dz_rho_up
+
+            self.rho_down = self.rho_up
+
+            self.dx_rho_down    = self.dx_rho_up
+            self.dy_rho_down    = self.dy_rho_up
+            self.dz_rho_down    = self.dz_rho_up
+            # Laplacian
             self.lap_down= self.lap_up
             self.tau_down = self.tau_up
             
         else:
-            dm = self.mf.make_rdm1()
-            self.dm_up = dm[0]
-            self.dm_down=dm[1]
-            self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
+            # Get the 1-e Density Matrix
+            dm              = self.mf.make_rdm1()
+            self.dm_up      = dm[0]
+            self.dm_down    = dm[1]
+            self.rho_up, self.dx_rho_up, self.dy_rho_up, self.dz_rho_up, self.lap_up, self.tau_up = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
 
-            self.rho_down,self.dx_rho_down,self.dy_rho_down,self.dz_rho_down,self.lap_down,self.tau_down = \
+            self.rho_down, self.dx_rho_down, self.dy_rho_down, self.dz_rho_down, self.lap_down, self.tau_down = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_down, xctype="MGGA")
+
         self.rho_tot = self.rho_up+self.rho_down
+
     def compute_ex_exact(self,ao_value,dm,coord):
         """
         Function to compute the exact kohn sham exchange energy density
@@ -149,8 +166,9 @@ class ModelXC:
             For spin unpolarized, the calculation are done uselessly for down spin
         """
         #here spin is defined as greater than one so we can exact up and down energies densites
-        exchange_functional,correlation_functional = functional.split(",")
-        zeros=np.zeros(self.n_grid) # also used so we can exact up and down energies densites
+        exchange_functional,correlation_functional  = functional.split(",")
+        zeros                                       = np.zeros(self.n_grid) # also used so we can exact up and down energies densites
+
         #mgga
         if dft.libxc.is_meta_gga(functional):
             mgga_up = [self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up]
@@ -183,20 +201,22 @@ class ModelXC:
             return self.approx_Exc
         else:
             try: 
-                Ex_up = np.einsum("i,i,i->",self.eps_x_up,self.rho_up,self.weights)
-                Ex_down = np.einsum("i,i,i->",self.eps_x_down,self.rho_down,self.weights)
-                Ec = np.einsum("i,i,i->",self.eps_c,self.rho_tot,self.weights)
-                self.Exc_post_approx = Ex_up+Ex_down+Ec
+                Ex_up                   = np.einsum("i,i,i->",self.eps_x_up,self.rho_up,self.weights)
+                Ex_down                 = np.einsum("i,i,i->",self.eps_x_down,self.rho_down,self.weights)
+                Ec                      = np.einsum("i,i,i->",self.eps_c,self.rho_tot,self.weights)
+                self.Exc_post_approx    = Ex_up + Ex_down + Ec
+
             except AttributeError:#if it was never calculated before
                 self.calc_eps_xc_post_approx(functional)
-                Ex_up = np.einsum("i,i,i->",self.eps_x_up,self.rho_up,self.weights)
-                Ex_down = np.einsum("i,i,i->",self.eps_x_down,self.rho_down,self.weights)
-                Ec = np.einsum("i,i,i->",self.eps_c,self.rho_tot,self.weights)
-                self.Exc_post_approx = Ex_up+Ex_down+Ec
+                Ex_up                   = np.einsum("i,i,i->",self.eps_x_up,self.rho_up,self.weights)
+                Ex_down                 = np.einsum("i,i,i->",self.eps_x_down,self.rho_down,self.weights)
+                Ec                      = np.einsum("i,i,i->",self.eps_c,self.rho_tot,self.weights)
+                self.Exc_post_approx    = Ex_up + Ex_down + Ec
+
             finally:
                 return self.Exc_post_approx
 
-    def calc_Etot_post_approx(self,functional):
+    def calc_Etot_post_approx(self, functional):
         """
         To calculate the total energies of a functional
         with post-approx densities
@@ -205,13 +225,17 @@ class ModelXC:
             functional:string
                 functional name in pyscf format
         """
-        if self.approx==functional:
+        if self.approx == functional:
             return self.mf.e_tot
+
         else:
             try:
-                self.Etot_post_approx=self.mf.e_tot-self.approx_Exc+self.Exc_post_approx
+                self.Etot_post_approx = self.mf.e_tot - self.approx_Exc + self.Exc_post_approx
+
             except AttributeError:
                 self.calc_Exc_post_approx(functional)
                 self.Etot_post_approx=self.mf.e_tot-self.approx_Exc+self.Exc_post_approx
+
             finally:
                 return self.Etot_post_approx
+
