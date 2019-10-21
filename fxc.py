@@ -18,19 +18,19 @@ class Fxc(ModelXC):
     def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
         super().__init__(molecule,positions,spin,approx,basis,num_threads)
         self.calc_eps_xks_post_approx()#for exks
-        f = h5py.File("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+self.mol_name+".h5",'r')
-        self.ux = np.array(f.get('ux'))
-        self.uwei = np.array(f.get('uwei'))
-        self.rhoRUA = np.array(f.get('rhoRUA'))
+        #f = h5py.File("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+self.mol_name+".h5",'r')
+        #self.ux = np.array(f.get('ux'))
+        #self.uwei = np.array(f.get('uwei'))
+        #self.rhoRUA = np.array(f.get('rhoRUA'))
         if self.mol.spin==0:
-            #self.ux,self.uwei,self.rhoRUA = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+\
-            #                                            self.mol_name+".npy",allow_pickle=True)
+            self.ux,self.uwei,self.rhoRUA = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+\
+                                                        self.mol_name+".npy",allow_pickle=True)
             self.rhoRUB=self.rhoRUA
         else:
-            #self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+\
-            #       self.mol_name+".npy",allow_pickle=True)
-            self.rhoRUB = np.array(f.get('rhoRUB'))
-        f.close()                                             
+            self.ux,self.uwei,self.rhoRUA,self.rhoRUB = np.load("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+\
+                   self.mol_name+".npy",allow_pickle=True)
+            #self.rhoRUB = np.array(f.get('rhoRUB'))
+        #f.close()                                             
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
         print(4.*np.pi*integrate.simps(self.ux_pow[2]*self.rhoRUA[5],x=self.ux_pow[1],even="first"))  
@@ -94,7 +94,7 @@ class Fxc(ModelXC):
         """
         fx2 = self.calc_fx(0.,0.,0.,gamma,0.,0.,0.,self.ux_pow[2])
         #return 4.*np.pi*integrate.simps(self.ux_pow[2]*rhoRU*fx2,x=self.ux_pow[1],even="first")+norm
-        return 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],rhoRU)+norm
+        return 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx2*rhoRU)-norm
 
     def calc_gamma_alpha_beta_chi(self,rhoRU,Q,lap,rho,epsilonX=None,norm=None,):
         """
@@ -193,13 +193,13 @@ class Fxc(ModelXC):
         #for exact exchange
         self.fx_up=self.calc_gamma_alpha_beta_chi(self.rhoRUA[gridID],self.Q_up[gridID],
                                                 self.lap_up[gridID],self.rho_up[gridID],
-                                                epsilonX=self.eps_x_exact_up[gridID],)
+                                                norm=-1.)
         if self.mol.nelectron==1:
             self.fx_down=self.fx_up*0
         else:
             self.fx_down = self.calc_gamma_alpha_beta_chi(self.rhoRUB[gridID],self.Q_down[gridID],
                                                     self.lap_down[gridID],self.rho_down[gridID],
-                                                    epsilonX=self.eps_x_exact_down[gridID])
+                                                    norm=-1)
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #renormalize
