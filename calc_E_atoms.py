@@ -2,7 +2,6 @@ from modelXC import ModelXC
 import numpy as np
 import sys
 from fxc import Fxc
-import multiprocess as mp
 
 #Dictionary with the atoms and it's total spin
 atoms={"H":1,"He":0,"Li":1,
@@ -76,18 +75,15 @@ def calc_E_postpbe(atom,positions,spin,functional):
     print(model_dict)
     return model_dict
 
-num_proc = sys.argv[1]
-functional = sys.argv[2]
-pool = mp.Pool(int(num_proc))
+functional = sys.argv[1]
 
 #Calculate for the models
 if functional=="EXKS":
-    results = pool.map(lambda atom:calc_E_EXKS(atom,[[0,0,0]],atoms[atom]),[atom for atom in atoms])
+    results = [calc_E_EXKS(atom,[[0,0,0]],atoms[atom]) for atom in atoms]
 elif functional == "fxc":
-    results = pool.map(lambda atom:calc_E_fxc(atom,[[0,0,0]],atoms[atom]),[atom for atom in atoms])
+    results = [calc_E_fxc(atom,[[0,0,0]],atoms[atom]) for atom in atoms]
 else:
-    results = pool.map(lambda atom:calc_E_postpbe(atom,[[0,0,0]],atoms[atom],functional),
-                                                    [atom for atom in atoms])
+    results = [calc_E_postpbe(atom,[[0,0,0]],atoms[atom],functional) for atom in atoms]
 
 #to convert the list of dictionaries to a dictionary
 results_dict = {}

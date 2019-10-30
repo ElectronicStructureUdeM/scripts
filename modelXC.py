@@ -3,6 +3,7 @@ import re
 import numpy as np
 from numba import vectorize,float64
 from BRx import brhparam
+import h5py
 class ModelXC:
     def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1, ASE=True):
         """
@@ -45,6 +46,8 @@ class ModelXC:
         self.mf.grids.radi_method=dft.radi.delley
         self.mf.xc=self.approx
         self.mf.kernel()
+        self.f = h5py.File("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+self.mol_name+".h5",'r')
+        self.approx_E_tot = np.array(self.f.get("Etot"))
         self.approx_Exc = self.mf.get_veff().exc
         if (self.mol.spin==0):
             self.NMOA = np.count_nonzero(self.mf.mo_occ)
@@ -52,14 +55,17 @@ class ModelXC:
         else:
             self.NMOA = np.count_nonzero(self.mf.mo_occ[0])
             self.NMOB = np.count_nonzero(self.mf.mo_occ[1])
-        #for stuff related to grid
-        self.coords = self.mf.grids.coords
-        self.weights = self.mf.grids.weights
+        #for stuff related to grid 
+        #self.coords = self.mf.grids.coords
+        #self.weights = self.mf.grids.weights
+        self.coords = np.array(self.f.get("grid_coords"))
+        self.weights = np.array(self.f.get("grid_weigths"))
         self.n_grid = np.shape(self.coords)[0]
         self.ao_values = dft.numint.eval_ao(self.mol, self.coords, deriv=2) #deriv=2, since we get every info(tau,lap,etc)
+        # parameters on the grid 
+        self.dm_up = np.array(self.f.get("dm_up"))
+        self.dm_down = np.array(self.f.get("dm_down"))
         if self.mol.spin==0:
-            self.dm_up = self.mf.make_rdm1(mo_occ=self.mf.mo_occ/2)
-            self.dm_down = self.dm_up
             self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
                                     dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
             grad_squared_up = self.dx_rho_up**2+self.dy_rho_up**2+self.dz_rho_up**2
@@ -75,9 +81,6 @@ class ModelXC:
             self.Q_down = self.Q_up
             
         else:
-            dm = self.mf.make_rdm1()
-            self.dm_up = dm[0]
-            self.dm_down=dm[1]
             self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
 
@@ -172,10 +175,10 @@ class ModelXC:
         To return the total energy using exact KS exchange
         """
         try: 
-            return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
+            return self.approx_E_tot-self.approx_Exc+self.Ex_KS_tot
         except AttributeError:#if it was never calculated before
             self.calc_Exks_post_approx()
-            return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
+            return self.approx_E_tot-self.approx_Exc+self.Ex_KS_tot
             
     def calc_eps_xc_post_approx(self,functional):
         """
@@ -246,12 +249,12 @@ class ModelXC:
                 functional name in pyscf format
         """
         if self.approx==functional:
-            return self.mf.e_tot
+            return self.approx_E_tot
         else:
             try:
-                self.Etot_post_approx=self.mf.e_tot-self.approx_Exc+self.Exc_post_approx
+                self.Etot_post_approx=self.approx_E_tot-self.approx_Exc+self.Exc_post_approx
             except AttributeError:
                 self.calc_Exc_post_approx(functional)
-                self.Etot_post_approx=self.mf.e_tot-self.approx_Exc+self.Exc_post_approx
+                self.Etot_post_approx=self.approx_E_tot-self.approx_Exc+self.Exc_post_approx
             finally:
                 return self.Etot_post_approx
