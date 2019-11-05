@@ -213,7 +213,7 @@ class ModelXC:
             self.eps_x_up,vx_up = dft.libxc.eval_xc(exchange_functional+",", [self.rho_up,zeros],spin=5)[:2]
             self.eps_x_down,vx_down = dft.libxc.eval_xc(exchange_functional+",", [zeros,self.rho_down],spin=5)[:2]
             self.eps_c,vc = dft.libxc.eval_xc(","+correlation_functional,[self.rho_up,self.rho_down],spin=5)[:2]
-
+        self.exc_post_approx=(self.eps_x_up*self.rho_up+self.eps_x_down*self.rho_down+self.eps_c*self.rho_tot)
     def calc_Exc_post_approx(self,functional):
         """
         To calculate the total exchange-correlation energy for a functional
