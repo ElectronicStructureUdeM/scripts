@@ -28,8 +28,8 @@ class Fxc(ModelXC):
         self.f.close()
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
-        print(4.*np.pi*integrate.simps(self.ux_pow[2]*self.rhoRUA[5],x=self.ux_pow[1],even="first"))
-        print(4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rhoRUA[5]))
+        self.N_model_up = np.zeros(self.n_grid)
+        self.N_model_down = np.zeros(self.n_grid)
 
 
     @vectorize([float64(float64,float64,float64, float64,float64,float64,float64,float64)])
@@ -112,19 +112,20 @@ class Fxc(ModelXC):
         """
         #gamma= scipy.optimize.brentq(self.find_gamma_norm,-1e-3,100,args=(norm,rhoRU))
         gamma= scipy.optimize.brentq(self.find_gamma_epsx,-1e-2,100,args=(epsilonX,rhoRU))
-        f1 = np.einsum("i,i,i,i->",self.ux_pow[1],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        f2 = np.einsum("i,i,i,i->",self.ux_pow[2],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        f3 = np.einsum("i,i,i,i->",self.ux_pow[3],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        f4 = np.einsum("i,i,i,i->",self.ux_pow[4],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        f5 = np.einsum("i,i,i,i->",self.ux_pow[5],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        f6 = np.einsum("i,i,i,i->",self.ux_pow[6],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
-        a_data = np.array([[f4,f6],
-                          [f3,f5]])
-        b_data = np.array([-1./(4.*np.pi)+f2,
-                        epsilonX/(2.*np.pi)+f1])
-        alpha,beta = np.linalg.solve(a_data,b_data)
+        #f1 = np.einsum("i,i,i,i->",self.ux_pow[1],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        #f2 = np.einsum("i,i,i,i->",self.ux_pow[2],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        #f3 = np.einsum("i,i,i,i->",self.ux_pow[3],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        #f4 = np.einsum("i,i,i,i->",self.ux_pow[4],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        #f5 = np.einsum("i,i,i,i->",self.ux_pow[5],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        #f6 = np.einsum("i,i,i,i->",self.ux_pow[6],self.uwei,rhoRU,np.exp(-gamma*self.ux_pow[2]))
+        #a_data = np.array([[f4,f6],
+        #                  [f3,f5]])
+        #b_data = np.array([-1./(4.*np.pi)+f2,
+        #                epsilonX/(2.*np.pi)+f1])
+        #alpha,beta = np.linalg.solve(a_data,b_data)
 
-        fx = self.calc_fx(alpha,beta,0.,gamma,self.ux_pow[2],self.ux_pow[4],0.,self.ux_pow[2])
+        #fx = self.calc_fx(alpha,beta,0.,gamma,self.ux_pow[2],self.ux_pow[4],0.,self.ux_pow[2])
+        fx = self.calc_fx(0.,0.,0.,gamma,0,0,0.,self.ux_pow[2])
         return fx
 
     ####for correlation######################
@@ -214,6 +215,10 @@ class Fxc(ModelXC):
         #to calculate energy
         #eps_xc = 2.*np.pi*integrate.simps(self.ux_pow[1]*self.fc*self.rho_x,
         #                                    x=self.ux_pow[1],even="first")
+        self.N_model_up[gridID]=4.*np.pi*np.einsum("i,i,i->",self.uwei,
+                                                self.ux_pow[2],self.fx_up*self.rhoRUA[gridID])
+        self.N_model_down[gridID]=4.*np.pi*np.einsum("i,i,i->",self.uwei,
+                                                self.ux_pow[2],self.fx_down*self.rhoRUB[gridID])
         eps_xc = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.fc*self.rho_x)
         return  eps_xc*self.rho_tot[gridID]
 
@@ -222,10 +227,28 @@ class Fxc(ModelXC):
         to calculate the total Exchange-correlation energy of the model
         """
         sum=0
+        N_up=0
+        N_down=0.
         for gridID in range(self.n_grid):
             sum+=self.calc_exc_fxc(gridID)*self.weights[gridID]
+            N_up += self.N_model_up[gridID]*self.weights[gridID]*self.rho_up[gridID]
+            N_down += self.N_model_down[gridID]*self.weights[gridID]*self.rho_down[gridID]
+        N_up = N_up/(self.NMOB+self.mol.spin)
+        N_down = N_down/(self.NMOB)
+        print(self.NMOB,self.NMOB+self.mol.spin)
         self.Exc = sum
         self.E_tot_model = self.approx_E_tot-self.approx_Exc+self.Exc
+        self.distance = np.linalg.norm(self.coords,axis=1)
+        plt.figure(figsize=(20,10))
+        plt.rcParams.update({'font.size': 22})
+        plt.scatter(self.distance,self.N_model_up,label="up spin, avg=%.3f"%N_up) 
+        plt.scatter(self.distance,self.N_model_down,label="down spin, avg=%.3f"%N_down)
+        plt.xlabel("Distance from origin (Bohr)")
+        plt.ylabel("Normalisation")
+        plt.title(self.mol_name)
+        plt.legend()
+        plt.tight_layout() 
+        plt.savefig(self.mol_name+"_norm.png")      
         return self.E_tot_model
 
 
