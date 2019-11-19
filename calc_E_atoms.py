@@ -46,7 +46,7 @@ def calc_E_fxc(atom,positions,spin):
         model_dict:dict
             atom_name:energy
     """
-    fxc = Fxc(atom,positions,atoms[atom],approx='pbe,pbe')
+    fxc = Fxc(atom,positions,atoms[atom],approx='lda,pw')
     E = fxc.calc_Etot_fxc()
     model_dict = {atom:E}
     print(model_dict)

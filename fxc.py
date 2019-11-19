@@ -85,6 +85,7 @@ class Fxc(ModelXC):
         """
         gamma= scipy.optimize.brentq(self.find_gamma_epsx,-5e-1,100,args=(epsilonX,rhoRU))
         fx = self.calc_fx(gamma,self.ux_pow[2])
+        print(gamma,epsilonX)
         return fx
 
     ####for correlation######################
@@ -129,18 +130,18 @@ class Fxc(ModelXC):
         """
         return (A+B*self.ux_pow[1]+C*self.ux_pow[2]+D*self.ux_pow[4])*np.exp(-E*self.ux_pow[2])
 
-    def find_E(self,E,epsilonXC):
+    def find_E(self,E,epsilonXC,A,B):
         """
-        TO calculate E, by reproducing an epsilonXC from an approximation, with ontop=1 and cusp=0
+        TO calculate E, by reproducing an epsilonXC from an approximation
         """
         f1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x*np.exp(-E*self.ux_pow[2]))
         f2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x*np.exp(-E*self.ux_pow[2]))
         f3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x*np.exp(-E*self.ux_pow[2]))
         f4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x*np.exp(-E*self.ux_pow[2]))
-        self.C= (-1./(4.*np.pi)-f2)/f4
+        self.C= (-1./(4.*np.pi)-A*f2-B*f3)/f4
 
-        eps_xc_calc = 2.*np.pi*(f1+self.C*f3)
-        print(eps_xc_calc,epsilonXC,E) 
+        eps_xc_calc = 2.*np.pi*(A*f1+B*f2+self.C*f3)
+        print(A,B,self.C,E,epsilonXC,eps_xc_calc)
         return eps_xc_calc-epsilonXC
 
     def calc_exc_fxc(self,gridID):
@@ -166,7 +167,7 @@ class Fxc(ModelXC):
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #calculate E
-        E=scipy.optimize.brentq(self.find_E,0.,500,args=(self.eps_xc_post_approx[gridID]))
+        E=scipy.optimize.brentq(self.find_E,0.,500,args=(self.eps_xc_post_approx[gridID],A,B))
         #renormalize
         #self.calc_C()
         
@@ -174,7 +175,7 @@ class Fxc(ModelXC):
         #to calculate energy
         #eps_xc = 2.*np.pi*integrate.simps(self.ux_pow[1]*self.fc*self.rho_x,
         #                                    x=self.ux_pow[1],even="first")
-        self.fc = self.calc_fc5(1.,0.,self.C,0.,E)
+        self.fc = self.calc_fc5(A,B,self.C,0.,E)
     
         eps_xc = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.fc*self.rho_x)
         return  eps_xc*self.rho_tot[gridID]
