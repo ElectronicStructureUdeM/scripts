@@ -58,7 +58,7 @@ class ModelXC:
             self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
                                     dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
             grad_squared_up = self.dx_rho_up**2+self.dy_rho_up**2+self.dz_rho_up**2
-            self.D_up = self.tau_up-(1./4.)*grad_squared_up/self.rho_up
+            self.D_up = self.tau_up*2.-(1./4.)*grad_squared_up/self.rho_up
             self.Q_up = 1./6.*(self.lap_up-2.*self.D_up)
             self.rho_down=self.rho_up
             self.dx_rho_down=self.dx_rho_up
@@ -79,11 +79,11 @@ class ModelXC:
             self.rho_down,self.dx_rho_down,self.dy_rho_down,self.dz_rho_down,self.lap_down,self.tau_down = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_down, xctype="MGGA")
             grad_squared_up = self.dx_rho_up**2+self.dy_rho_up**2+self.dz_rho_up**2
-            self.D_up = self.tau_up-(1./4.)*grad_squared_up/self.rho_up
+            self.D_up = self.tau_up*2.-(1./4.)*grad_squared_up/self.rho_up
             self.Q_up = 1./6.*(self.lap_up-2.*self.D_up) 
             #
             grad_squared_down = self.dx_rho_down**2+self.dy_rho_down**2+self.dz_rho_down**2
-            self.D_down = self.tau_down-(1./4.)*grad_squared_down/self.rho_down
+            self.D_down = self.tau_down*2.-(1./4.)*grad_squared_down/self.rho_down
             self.Q_down = 1./6.*(self.lap_down-2.*self.D_down)           
         self.rho_tot = self.rho_up+self.rho_down
         self.zeta = (self.rho_up-self.rho_down)/self.rho_tot
