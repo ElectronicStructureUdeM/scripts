@@ -141,8 +141,9 @@ class Fxc(ModelXC):
         self.C= (-1./(4.*np.pi)-A*f2-B*f3)/f4
 
         eps_xc_calc = 2.*np.pi*(A*f1+B*f2+self.C*f3)
-        print(A,B,self.C,E,epsilonXC,eps_xc_calc)
-        return eps_xc_calc-epsilonXC
+        print(E,4.*np.pi*(A*f2+B*f3))
+        #return eps_xc_calc-epsilonXC
+        return 4.*np.pi*(A*f2+B*f3)+1
 
     def calc_exc_fxc(self,gridID):
         """
@@ -157,17 +158,17 @@ class Fxc(ModelXC):
         #for exact exchange
         self.fx_up=self.calc_gamma(self.rhoRUA[gridID],self.Q_up[gridID],
                                                 self.lap_up[gridID],self.rho_up[gridID],
-                                                epsilonX=self.eps_x_up[gridID])
+                                                epsilonX=self.eps_x_exact_up[gridID])
         if self.mol.nelectron==1:
             self.fx_down=self.fx_up*0
         else:
             self.fx_down = self.calc_gamma(self.rhoRUB[gridID],self.Q_down[gridID],
                                                     self.lap_down[gridID],self.rho_down[gridID],
-                                                    epsilonX=self.eps_x_down[gridID])
+                                                    epsilonX=self.eps_x_exact_down[gridID])
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #calculate E
-        E=scipy.optimize.brentq(self.find_E,0.,500,args=(self.eps_xc_post_approx[gridID],A,B))
+        E=scipy.optimize.brentq(self.find_E,-1e-8,500,args=(self.eps_xc_post_approx[gridID],A,B))
         #renormalize
         #self.calc_C()
         
@@ -175,7 +176,7 @@ class Fxc(ModelXC):
         #to calculate energy
         #eps_xc = 2.*np.pi*integrate.simps(self.ux_pow[1]*self.fc*self.rho_x,
         #                                    x=self.ux_pow[1],even="first")
-        self.fc = self.calc_fc5(A,B,self.C,0.,E)
+        self.fc = self.calc_fc5(A,B,0.,0.,E)
     
         eps_xc = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.fc*self.rho_x)
         return  eps_xc*self.rho_tot[gridID]
