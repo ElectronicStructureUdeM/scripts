@@ -5,6 +5,7 @@ from numba import vectorize, float64
 import matplotlib.pyplot as plt
 from scipy import integrate
 import h5py
+from moment_jx_E import *
 class Fxc(ModelXC):
     """
     Simple one parameters exchange factor: fx=np.exp(-gamma*u**2)
@@ -85,7 +86,6 @@ class Fxc(ModelXC):
         """
         gamma= scipy.optimize.brentq(self.find_gamma_epsx,-5e-1,100,args=(epsilonX,rhoRU))
         fx = self.calc_fx(gamma,self.ux_pow[2])
-        print(gamma,epsilonX)
         return fx
 
     ####for correlation######################
@@ -129,21 +129,19 @@ class Fxc(ModelXC):
         fc = (A+B*u+C*u**2+D*u**4)*exp(-E*u**2)
         """
         return (A+B*self.ux_pow[1]+C*self.ux_pow[2]+D*self.ux_pow[4])*np.exp(-E*self.ux_pow[2])
-
-    def find_E(self,E,epsilonXC,A,B):
+    def find_E(self,E,zeta,gamma,A,B,epsilonXC,rho,kf):
         """
         TO calculate E, by reproducing an epsilonXC from an approximation
         """
-        f1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x*np.exp(-E*self.ux_pow[2]))
-        f2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x*np.exp(-E*self.ux_pow[2]))
-        f3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x*np.exp(-E*self.ux_pow[2]))
-        f4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x*np.exp(-E*self.ux_pow[2]))
-        self.C= (-1./(4.*np.pi)-A*f2-B*f3)/f4
+        m1 = moment1JXE(zeta,gamma,E)
+        m2 = moment2JXE(zeta,gamma,E)
+        m3 = moment3JXE(zeta,gamma,E)
+        m4 = moment4JXE(zeta,gamma,E)
+        C= -(3.*np.pi/4.+A*m2+B*m3)/m4
 
-        eps_xc_calc = 2.*np.pi*(A*f1+B*f2+self.C*f3)
-        print(E,4.*np.pi*(A*f2+B*f3))
-        #return eps_xc_calc-epsilonXC
-        return 4.*np.pi*(A*f2+B*f3)+1
+        eps_xc_calc = 2.*np.pi*rho/(kf**2)*(A*m1+B*m2+C*m3)
+        print(eps_xc_calc-epsilonXC,E)
+        return eps_xc_calc-epsilonXC
 
     def calc_exc_fxc(self,gridID):
         """
@@ -168,7 +166,11 @@ class Fxc(ModelXC):
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #calculate E
-        E=scipy.optimize.brentq(self.find_E,-1e-8,500,args=(self.eps_xc_post_approx[gridID],A,B))
+        GAMMALOC=4./9.
+        E=scipy.optimize.brentq(self.find_E,1e-20,500,args=(self.zeta[gridID],GAMMALOC,
+                                    A,B/self.kf[gridID],self.eps_xc_post_approx[gridID],
+                                    self.rho_tot[gridID],self.kf[gridID]))*self.kf[gridID]**2
+        print(E)
         #renormalize
         #self.calc_C()
         
@@ -191,7 +193,6 @@ class Fxc(ModelXC):
             sum+=self.calc_exc_fxc(gridID)*self.weights[gridID]
         self.Exc = sum
         self.E_tot_model = self.approx_E_tot-self.approx_Exc+self.Exc
-        print(self.Exc)
         return self.E_tot_model
 
 
