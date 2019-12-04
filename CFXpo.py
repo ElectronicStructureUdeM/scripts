@@ -43,6 +43,16 @@ class CFXN(ModelXC):
 
     
     def calc_BRXN_params(self,rho,eps_x):
+        """
+        To calculate the parameters of the becke roussel normalized echange
+        hole which reproduces an energy density from an approximation
+
+        Input:
+            rho: local electronic density
+            eps_x: exchange energy density per particle to reproduce
+        returns:
+            a,b,c,d: Becke-Roussel model parameters
+        """
         a,b,c,d = brxnparam(rho,eps_x)
         kf = (3.0*(np.pi**2.0) *rho)**(1.0/3.0)
         a = a/kf
@@ -52,12 +62,24 @@ class CFXN(ModelXC):
         return a,b,c,d
     
     def calc_jx_approx(self,gridID,eps_x_up,eps_x_down):
+        """
+        Calculate the total reduced exchange hole BR exchange hole which reproduces
+        the exchange energy density per particle of an approximation
+
+        Input:
+            gridID:current grid point ID
+            eps_x_up:up spin epsilon_x to reproduce
+            eps_x_down: down epsilon_x to reproduce
+        Return:
+            jx: total reduced exchange hole
+
+        """
         br_a_up,br_b_up,br_c_up,br_d_up = self.calc_BRXN_params(self.rho_up[gridID],
                                                                     eps_x_up)
         if (self.mol.spin>0 and self.mol.nelectron>1):
             br_a_down,br_b_down,br_c_down,br_d_down = self.calc_BRXN_params(self.rho_down[gridID],
                                                                 eps_x_down)
-        elif self.mol.nelectron==1:#for hydrogen
+        elif self.mol.nelectron==1:#for hydrogen or one electron system
             br_a_down,br_b_down,br_c_down,br_d_down=(0,0,0,0)
         else:
             br_a_down,br_b_down,br_c_down,br_d_down=(br_a_up,br_b_up,br_c_up,br_d_up)
@@ -73,6 +95,8 @@ class CFXN(ModelXC):
                 wigner radius
             zeta:
                 spin polarisation
+        Return:
+            A
         """
         mu=0.193
         nu=0.525
@@ -87,6 +111,8 @@ class CFXN(ModelXC):
                 wigner radius
             zeta:
                 spin polarisation
+        Return:
+            B
         """
         a=0.193
         b=0.525
@@ -98,9 +124,28 @@ class CFXN(ModelXC):
         return (-4.0/(3.0*np.pi*kappa))*rs*H*((1.0-zeta**2)/(zeta**2+1.0))*((1.0+a*rs)/(1.0+b*rs+a*b*rs**2))
     
     def moment_JX_E(self,E,n,JX):
+        """
+        Calculate the following integral:
+        int_miny^maxy dy y^n * exp(-E*y^2)*jx(y)
+
+        Input:
+            E: parameter
+            n: power of y
+            JX: reduced exchange hole
+        return:
+            integral value
+        """
         return np.sum(self.y_weights*self.y_values_power[n]*JX*np.exp(-E*self.y_values_power[2]))
 
     def calc_C(self,E):
+        """
+        Calculate the parameter C, which is used to normalize the XC hole
+        Input:
+            E:parameter of fc
+        return:
+            C
+        """
+
         #compute the moments and C
         m1 = self.moment_JX_E(E,1,self.JX_LSD)
         m2 = self.moment_JX_E(E,2,self.JX_LSD)
@@ -109,6 +154,14 @@ class CFXN(ModelXC):
         return m1,m2,m3,m4,-(3.*np.pi/4.+m2*self.A+m3*self.B)/m4
     
     def find_E(self,E,rho,kf,epsilonXC):
+        """
+        Function to find E, by reproducing and epsilon_XC from an approximation
+        
+        Input:
+
+        Return:
+
+        """
         m1,m2,m3,m4,self.C = self.calc_C(E)
         xcint = self.A*m1+self.B*m2+self.C*m3
         self.eps_xc_LSD_calc = 2*np.pi*rho/kf**2*xcint
@@ -163,19 +216,22 @@ class CFXN(ModelXC):
         self.eps_xc_calc = 2.*np.pi*self.rho_tot[gridID]/self.kf[gridID]**2*(self.A*m1+
                                         self.B*m2+self.C*m3+self.D*m5)
 
-        return self.eps_xc_calc-(self.eps_x_exact_up[gridID]*self.rho_up[gridID]+self.eps_x_exact_down[gridID]*self.rho_down[gridID])/self.rho_tot[gridID]
+        return self.eps_xc_calc
    
     def calc_Exc_cfxn(self):
         sum=0.
         for gridID in range(self.n_grid):
             sum+=self.weights[gridID]*self.rho_tot[gridID]*self.calc_eps_xc_cfxn(gridID)
-        print(sum)
+        return sum
 
+    def calc_Etot_cfxn(self):
+        Exc = self.calc_Exc_cfxn()
+        print (self.mf.e_tot-self.approx_Exc+Exc)
 
 
 
 test = CFXN('Ar',[],0,basis = 'cc-pvtz',ASE=False)
-test.calc_Exc_cfxn()
+test.calc_Etot_cfxn()
 
 
 
