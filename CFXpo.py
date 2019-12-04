@@ -83,7 +83,6 @@ class CFX:
     def Cdenav(self,u):
         E = self.E
         return u**4*self.Jxav(u)*np.exp(-E*u**2)
-
     def Get_C(self,E):
         #print(E)
         #numint =  scipy.integrate.quad(self.Cnumintegrand,1e-10,np.inf,args=(E))[0]
@@ -120,7 +119,6 @@ class CFX:
 
         C = (-1.0-4.0/(3.0*np.pi) * numint)/(4.0/(3.0*np.pi) *denint)
         return C
-
     def findE(self,E):
         #print(E)
         rhot = self.rhot
@@ -141,7 +139,7 @@ class CFX:
         xcint = np.einsum('i,i',xc,uwei)
 
         return 2*np.pi*rhot/(kf**2)*xcint - self.xcLSD
-
+    
     def Get_E(self):
       sol = scipy.optimize.root_scalar(self.findE,bracket=[0.0,1000], method = 'brentq') 
       self.E = sol.root
@@ -181,7 +179,7 @@ class CFX:
         H = (1.0+u*rs)/(2.0+v*rs+t*rs**2)
         lsdot = self.LSDOT()
         return (4.0/(3.0*Pi*kappa))*rs*H*(lsdot+1.0)
-
+    @profile
     def Get_CD(self,eps):
         A = self.A
         B = self.B
@@ -204,6 +202,7 @@ class CFX:
         self.D = D
 
 mod = ModelXC('He',[],0,basis = 'ccpvtz',ASE=False)
+
 
 def CFX_XC(mod):
  Ngrid = mod.n_grid
