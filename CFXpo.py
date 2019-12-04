@@ -74,8 +74,11 @@ class CFXN(ModelXC):
         self.E=self.calc_E(self.rho_tot[gridID],self.kf[gridID],self.eps_xc_LSD[gridID])
 
         #for jx pbe
-        #self.JX_PBE = self.calc_jx_approx(gridID,self.eps_x_PBE_up[gridID],self.eps_x_PBE_down[gridID])
-        return self.eps_xc_LSD_calc
+        self.JX_PBE = self.calc_jx_approx(gridID,self.eps_x_PBE_up[gridID],self.eps_x_PBE_down[gridID])
+
+        #for C,D pbe
+        self.calc_CD(self.rho_tot[gridID],self.kf[gridID],self.eps_xc_PBE[gridID])
+        return self.eps_xc_PBE_calc
    
     def calc_Exc_cfxn(self):
         sum=0.
@@ -115,15 +118,15 @@ class CFXN(ModelXC):
         H = (1.0+u*rs)/(2.0+v*rs+t*rs**2)
         return (-4.0/(3.0*np.pi*kappa))*rs*H*((1.0-zeta**2)/(zeta**2+1.0))*((1.0+a*rs)/(1.0+b*rs+a*b*rs**2))
     
-    def moment_JX_LSD_E(self,E,n):
-        return np.sum(self.y_weights*self.y_values_power[n]*self.JX_LSD*np.exp(-E*self.y_values_power[2]))
-    
+    def moment_JX_E(self,E,n,JX):
+        return np.sum(self.y_weights*self.y_values_power[n]*JX*np.exp(-E*self.y_values_power[2]))
+
     def calc_C(self,E):
         #compute the moments and C
-        m1 = self.moment_JX_LSD_E(E,1)
-        m2 = self.moment_JX_LSD_E(E,2)
-        m3 = self.moment_JX_LSD_E(E,3)
-        m4 = self.moment_JX_LSD_E(E,4)
+        m1 = self.moment_JX_E(E,1,self.JX_LSD)
+        m2 = self.moment_JX_E(E,2,self.JX_LSD)
+        m3 = self.moment_JX_E(E,3,self.JX_LSD)
+        m4 = self.moment_JX_E(E,4,self.JX_LSD)
         return m1,m2,m3,m4,-(3.*np.pi/4.+m2*self.A+m3*self.B)/m4
     
     def find_E(self,E,rho,kf,epsilonXC):
@@ -137,6 +140,19 @@ class CFXN(ModelXC):
                                     method = 'brentq',args=(rho,kf,epsilonXC)) 
         return sol.root
 
+    def calc_CD(self,rho,kf,eps_xc):
+        m1 = self.moment_JX_E(self.E,1,self.JX_PBE)
+        m2 = self.moment_JX_E(self.E,2,self.JX_PBE)
+        m3 = self.moment_JX_E(self.E,3,self.JX_PBE)
+        m4 = self.moment_JX_E(self.E,4,self.JX_PBE)
+        m5 = self.moment_JX_E(self.E,5,self.JX_PBE)
+        m6 = self.moment_JX_E(self.E,6,self.JX_PBE)
+        a=np.array([[m4,m6],
+                    [m3,m5]])
+        b=np.array([-(3.*np.pi/4.+self.A*m2+self.B*m3),
+                    eps_xc*kf**2/(2.*np.pi*rho)-self.A*m1-self.B*m2])
+        self.C,self.D = np.linalg.solve(a, b)
+        self.eps_xc_PBE_calc=2.*np.pi*rho/kf**2*(self.A*m1+self.B*m2+self.C*m3+self.D*m5)
 
 
 test = CFXN('He',[],0,basis = 'cc-pvtz',ASE=False)
