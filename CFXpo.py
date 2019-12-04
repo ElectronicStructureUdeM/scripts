@@ -51,27 +51,37 @@ class CFXN(ModelXC):
         d = d/kf
         return a,b,c,d
     
+    def calc_jx_approx(self,gridID,eps_x_up,eps_x_down):
+        br_a_up,br_b_up,br_c_up,br_d_up = self.calc_BRXN_params(self.rho_up[gridID],
+                                                                    eps_x_up)
+        if (self.mol.spin>0 and self.mol.nelectron>1):
+            br_a_down,br_b_down,br_c_down,br_d_down = self.calc_BRXN_params(self.rho_down[gridID],
+                                                                eps_x_down)
+        elif self.mol.nelectron==1:#for hydrogen
+            br_a_down,br_b_down,br_c_down,br_d_down=(0,0,0,0)
+        else:
+            br_a_down,br_b_down,br_c_down,br_d_down=(br_a_up,br_b_up,br_c_up,br_d_up)
+
+        return  brholedtot(self.y_values,self.zeta[gridID],br_a_up,br_b_up,br_c_up,br_d_up,
+                                br_a_down,br_b_down,br_c_down,br_d_down)
+
     def calc_eps_xc_cfxn(self,gridID):
         # for jx lsd
-        br_a_lsd_up,br_b_lsd_up,br_c_lsd_up,br_d_lsd_up = self.calc_BRXN_params(self.rho_up[gridID],
-                                                                    self.eps_x_LSD_up[gridID])
-        if (self.mol.spin>0 and self.mol.nelectron>1):
-            br_a_lsd_down,br_b_lsd_down,br_c_lsd_down,br_d_lsd_down = self.calc_BRXN_params(self.rho_down[gridID],
-                                                                self.eps_x_LSD_down[gridID])
-        elif self.mol.nelectron==1:#for hydrogen
-            br_a_lsd_down,br_b_lsd_down,br_c_lsd_down,br_d_lsd_down=(0,0,0,0)
-        else:
-            br_a_lsd_down,br_b_lsd_down,br_c_lsd_down,br_d_lsd_down=(br_a_lsd_up,br_b_lsd_up,br_c_lsd_up,br_d_lsd_up)
-        self.JX_LSD = brholedtot(self.y_values,self.zeta[gridID],br_a_lsd_up,br_b_lsd_up,br_c_lsd_up,br_d_lsd_up,
-                                br_a_lsd_down,br_b_lsd_down,br_c_lsd_down,br_d_lsd_down)
+        self.JX_LSD = self.calc_jx_approx(gridID,self.eps_x_LSD_up[gridID],self.eps_x_LSD_down[gridID])
         # for fc lsd
         self.A = self.calc_A(self.rs[gridID],self.zeta[gridID])
         self.B = self.calc_B(self.rs[gridID],self.zeta[gridID])
         self.E=self.calc_E(self.rho_tot[gridID],self.kf[gridID],self.eps_xc_LSD[gridID])
+
+        #for jx pbe
+        #self.JX_PBE = self.calc_jx_approx(gridID,self.eps_x_PBE_up[gridID],self.eps_x_PBE_down[gridID])
+        return self.eps_xc_LSD_calc
    
     def calc_Exc_cfxn(self):
+        sum=0.
         for gridID in range(self.n_grid):
-            self.calc_eps_xc_cfxn(gridID)
+            sum+=self.weights[gridID]*self.rho_tot[gridID]*self.calc_eps_xc_cfxn(gridID)
+        print(sum)
 
     def calc_A(self,rs,zeta):
         """
@@ -119,7 +129,8 @@ class CFXN(ModelXC):
     def find_E(self,E,rho,kf,epsilonXC):
         m1,m2,m3,m4,self.C = self.calc_C(E)
         xcint = self.A*m1+self.B*m2+self.C*m3
-        return 2*np.pi*rho/kf**2*xcint-epsilonXC
+        self.eps_xc_LSD_calc = 2*np.pi*rho/kf**2*xcint
+        return self.eps_xc_LSD_calc-epsilonXC
     
     def calc_E(self,rho,kf,epsilonXC):
         sol = scipy.optimize.root_scalar(self.find_E,bracket=[0.0,1000], 
