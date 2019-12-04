@@ -179,7 +179,6 @@ class CFX:
         H = (1.0+u*rs)/(2.0+v*rs+t*rs**2)
         lsdot = self.LSDOT()
         return (4.0/(3.0*Pi*kappa))*rs*H*(lsdot+1.0)
-    @profile
     def Get_CD(self,eps):
         A = self.A
         B = self.B
