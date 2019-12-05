@@ -83,7 +83,8 @@ class CFXN(ModelXC):
             br_a_down,br_b_down,br_c_down,br_d_down=(0,0,0,0)
         else:
             br_a_down,br_b_down,br_c_down,br_d_down=(br_a_up,br_b_up,br_c_up,br_d_up)
-
+        if (br_a_up<0 or br_b_up<0):
+            exit("negative a or b in BR parameters")
         return  brholedtot(self.y_values,self.zeta[gridID],br_a_up,br_b_up,br_c_up,br_d_up,
                                 br_a_down,br_b_down,br_c_down,br_d_down)
 
@@ -155,12 +156,15 @@ class CFXN(ModelXC):
     
     def find_E(self,E,rho,kf,epsilonXC):
         """
-        Function to find E, by reproducing and epsilon_XC from an approximation
+        Target function to find E, by reproducing and epsilon_XC from an approximation
         
         Input:
-
+            E: parameter of fc
+            rho: local electronic density
+            kf: fermi wavevector
+            epsilonXC: epsilonXC to reproduce
         Return:
-
+            calculate epsilonXC - target epsilonXC
         """
         m1,m2,m3,m4,self.C = self.calc_C(E)
         xcint = self.A*m1+self.B*m2+self.C*m3
@@ -168,11 +172,33 @@ class CFXN(ModelXC):
         return self.eps_xc_LSD_calc-epsilonXC
     
     def calc_E(self,rho,kf,epsilonXC):
+        """
+        To calculate the E parameter of fc by using a root finding algorithm to reproduce an epsilonXC
+
+        Input:
+            rho:electronic density
+            kf: fermi wavevector
+            epsilonXC: espilonXC to reproduce
+        Return:
+            E
+        """
         sol = scipy.optimize.root_scalar(self.find_E,bracket=[0.0,1000], 
                                     method = 'brentq',args=(rho,kf,epsilonXC)) 
         return sol.root
 
     def calc_CD(self,rho,kf,eps_xc):
+        """
+        Calculate the C and D parameter by solving the system of linear equation
+        by normalizing the XC hole and reproducing and epsilonxc from an approximation
+
+        Input:
+            rho: electronic density local
+            kf: fermi wave vector
+            eps_xc: epsilonXC to reproduce
+        Return:
+            C,D
+        """
+
         m1 = self.moment_JX_E(self.E,1,self.JX_PBE)
         m2 = self.moment_JX_E(self.E,2,self.JX_PBE)
         m3 = self.moment_JX_E(self.E,3,self.JX_PBE)
@@ -188,6 +214,14 @@ class CFXN(ModelXC):
         return C,D
 
     def calc_eps_xc_cfxn(self,gridID):
+        """
+        To calculate the XC energy density per particle for CFXN.
+
+        Input:
+            gridID: current grid point
+        Return:
+            epsilonXC calculated
+        """
         # for jx lsd
         self.JX_LSD = self.calc_jx_approx(gridID,self.eps_x_LSD_up[gridID],self.eps_x_LSD_down[gridID])
         # for fc lsd
@@ -203,15 +237,20 @@ class CFXN(ModelXC):
                                                 self.kf[gridID],self.eps_xc_PBE[gridID])
         
         #for jx exact
+        #For cfxN begin
         #self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
         #                                          self.eps_x_exact_down[gridID])
+        # for cfxn end
+
+        #for cfx begin
         kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
         kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
         self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],self.br_a_up[gridID]/kfa,
                                         self.br_b_up[gridID]*kfa,self.br_c_up[gridID]/self.rho_up[gridID],0.,
                                         self.br_a_down[gridID]/kfb,self.br_b_down[gridID]*kfb,
                                         self.br_c_down[gridID]/self.rho_down[gridID],0)
-        #print(self.JX_Exact)
+        #for cfx end
+        
         #to calculate C and energy 
         m1 = self.moment_JX_E(self.E,1,self.JX_Exact)
         m2 = self.moment_JX_E(self.E,2,self.JX_Exact)
@@ -226,6 +265,12 @@ class CFXN(ModelXC):
         return self.eps_xc_calc
    
     def calc_Exc_cfxn(self):
+        """
+        To calculate the total XC energy.
+
+        Return:
+            Exc
+        """
         sum=0.
         for gridID in range(self.n_grid):
             if self.rho_tot[gridID]>1e-8:
@@ -233,8 +278,15 @@ class CFXN(ModelXC):
         return sum
 
     def calc_Etot_cfxn(self):
+        """
+        To calculate the total energy
+
+        Return
+        """
         Exc = self.calc_Exc_cfxn()
-        print (self.mf.e_tot-self.approx_Exc+Exc)
+        Etot = self.mf.e_tot-self.approx_Exc+Exc
+        print(Etot)
+        return Etot
 
 
 
