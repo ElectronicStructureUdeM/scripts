@@ -76,14 +76,15 @@ class CFXN(ModelXC):
         """
         br_a_up,br_b_up,br_c_up,br_d_up = self.calc_BRXN_params(self.rho_up[gridID],
                                                                     eps_x_up)
+        
         if (self.mol.spin>0 and self.mol.nelectron>1):
             br_a_down,br_b_down,br_c_down,br_d_down = self.calc_BRXN_params(self.rho_down[gridID],
                                                                 eps_x_down)
         elif self.mol.nelectron==1:#for hydrogen or one electron system
-            br_a_down,br_b_down,br_c_down,br_d_down=(0,0,0,0)
+            br_a_down,br_b_down,br_c_down,br_d_down=(0.,0.,0.,0.)
         else:
             br_a_down,br_b_down,br_c_down,br_d_down=(br_a_up,br_b_up,br_c_up,br_d_up)
-        if (br_a_up<0 or br_b_up<0):
+        if (br_a_up<0 or br_b_up<0 or br_a_down<0 or br_b_down<0):
             exit("negative a or b in BR parameters")
         return  brholedtot(self.y_values,self.zeta[gridID],br_a_up,br_b_up,br_c_up,br_d_up,
                                 br_a_down,br_b_down,br_c_down,br_d_down)
@@ -245,10 +246,21 @@ class CFXN(ModelXC):
         #for cfx begin
         kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
         kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
-        self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],self.br_a_up[gridID]/kfa,
-                                        self.br_b_up[gridID]*kfa,self.br_c_up[gridID]/self.rho_up[gridID],0.,
-                                        self.br_a_down[gridID]/kfb,self.br_b_down[gridID]*kfb,
-                                        self.br_c_down[gridID]/self.rho_down[gridID],0)
+        br03_a_up = self.br_a_up[gridID]/kfa
+        br03_b_up = self.br_b_up[gridID]*kfa
+        br03_c_up = self.br_c_up[gridID]/self.rho_up[gridID]
+        if self.mol.nelectron>1:
+            br03_a_down = self.br_a_down[gridID]/kfb
+            br03_b_down = self.br_b_down[gridID]*kfb
+            br03_c_down = self.br_c_down[gridID]/self.rho_down[gridID]
+        else:
+            br03_a_down=0.
+            br03_b_down=0.
+            br03_c_down=0.
+        self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
+                                        br03_b_up,br03_c_up,0.,
+                                        br03_a_down,br03_b_down,
+                                        br03_c_down,0)
         #for cfx end
         
         #to calculate C and energy 
@@ -261,6 +273,7 @@ class CFXN(ModelXC):
         self.C = -(3.*np.pi/4.+m2*self.A+m3*self.B+m6*self.D)/m4
         self.eps_xc_calc = 2.*np.pi*self.rho_tot[gridID]/self.kf[gridID]**2*(self.A*m1+
                                         self.B*m2+self.C*m3+self.D*m5)
+                                        
 
         return self.eps_xc_calc
    
@@ -285,13 +298,13 @@ class CFXN(ModelXC):
         """
         Exc = self.calc_Exc_cfxn()
         Etot = self.mf.e_tot-self.approx_Exc+Exc
-        print(Etot)
+        #print(Etot)
         return Etot
 
 
 
-test = CFXN('Ar',[],0,basis = 'cc-pvtz',ASE=False)
-test.calc_Etot_cfxn()
+#test = CFXN('Ar',[],0,basis = 'cc-pvtz',ASE=False)
+#test.calc_Etot_cfxn()
 
 
 

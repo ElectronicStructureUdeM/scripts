@@ -2,7 +2,7 @@ import numpy as np
 import sys
 from modelXC import ModelXC
 import re
-from fxc import Fxc
+from CFXpo import CFXN
 """
 Script to compute the atomization energies of functional/6-311+g(2d,p) for a small dataset. 
 The energies are calculated in a post-PBE way, thus not self-consistent
@@ -69,9 +69,9 @@ def atomization(mol,positions,spin,functional):
         if functional=="EXKS":
             post_pbe  = ModelXC(mol,positions,spin,approx='pbe,pbe')
             E_mol =post_pbe.calc_total_energy_Ex_ks()
-        elif functional == "fxc":
-            fxc = Fxc(mol,positions,spin,approx='pbe,pbe')
-            E_mol = fxc.calc_Etot_fxc()
+        elif functional == "cfxn":
+            cfxn = CFXN(mol,positions,spin,approx='pbe,pbe',basis='cc-pvtz',ASE=True)
+            E_mol = cfxn.calc_Etot_cfxn()
         else:
             post_pbe  = ModelXC(mol,positions,spin,approx='pbe,pbe')
             E_mol=post_pbe.calc_Etot_post_approx(functional)

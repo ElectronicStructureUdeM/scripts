@@ -20,7 +20,11 @@ def brholetot(u,zeta,aa,ab,ac,ba,bb,bc):
     return (0.5*(1+zeta))*brhole(u,aa,ab,ac) + (0.5*(1-zeta))*brhole(u,ba,bb,bc)
 
 def brholed(u,a,b,c,d):
-    return 1/(1+d*u**4) * -c/(2*a**2*b*u)* ((a*np.abs(b-u)+1)*np.exp(-a*np.abs(b-u)) - (a*np.abs(b+u)+1)*np.exp(-a*np.abs(b+u)))
+    np.seterr(invalid='raise')
+    try:
+        return 1/(1+d*u**4) * -c/(2*a**2*b*u)* ((a*np.abs(b-u)+1)*np.exp(-a*np.abs(b-u)) - (a*np.abs(b+u)+1)*np.exp(-a*np.abs(b+u)))
+    except FloatingPointError:#a, b,c or u are zeros, zeros are returned
+        return np.zeros(np.shape(u)[0])
 
 def brholedtot(u,zeta,aa,ab,ac,ad,ba,bb,bc,bd):
     return (0.25*(1+zeta)**2)*brholed(((0.5*(1+zeta))**(1.0/3.0))*u,aa,ab,ac,ad) + (0.25*(1-zeta)**2)*brholed(((0.5*(1-zeta))**(1.0/3.0))*u,ba,bb,bc,bd)
@@ -61,7 +65,7 @@ def brhparam(Q,rho,epsx):
     c = np.zeros(size)
     n = np.zeros(size)
     for gridID in range(size):
-        if rho[gridID] > 1e-8:
+        if rho[gridID] > 1e-10:
          Qp = Q[gridID]/(rho[gridID]**2) * epsx[gridID]
          sol = scipy.optimize.root_scalar(findxbr, args=(Qp), xtol=1e-10, bracket=[1e-8,1000] , method='brentq')
          sol = sol.root

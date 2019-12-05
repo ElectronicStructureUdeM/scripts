@@ -1,11 +1,12 @@
 from modelXC import ModelXC
 import numpy as np
 import sys
-from fxc import Fxc
+from CFXpo import CFXN
 
 #Dictionary with the atoms and it's total spin
 atoms={"H":1,"He":0,"Li":1,
-        "Be":0,"B":1,"C":2,"N":3,
+        "Be":0,"B":1,
+         "C":2,"N":3,
         "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,
         "Mg":0,"Al":1,"Si":2,"P":3,"S":2,"Cl":1,
         "Ar":0}
@@ -31,9 +32,9 @@ def calc_E_EXKS(atom,positions,spin):
     print(model_dict)
     return model_dict
 
-def calc_E_fxc(atom,positions,spin):
+def calc_E_cfxn(atom,positions,spin):
     """
-    To calculate the total energies using fxc
+    To calculate the total energies using cfx
     with converged pbe densities
     Input:
         atom:string
@@ -46,8 +47,8 @@ def calc_E_fxc(atom,positions,spin):
         model_dict:dict
             atom_name:energy
     """
-    fxc = Fxc(atom,positions,atoms[atom],approx='pbe,pbe')
-    E = fxc.calc_Etot_fxc()
+    cfxn = CFXN(atom,positions,atoms[atom],approx='pbe,pbe',basis="cc-pvtz")
+    E = cfxn.calc_Etot_cfxn()
     model_dict = {atom:E}
     print(model_dict)
     return model_dict
@@ -80,8 +81,8 @@ functional = sys.argv[1]
 #Calculate for the models
 if functional=="EXKS":
     results = [calc_E_EXKS(atom,[[0,0,0]],atoms[atom]) for atom in atoms]
-elif functional == "fxc":
-    results = [calc_E_fxc(atom,[[0,0,0]],atoms[atom]) for atom in atoms]
+elif functional == "cfxn":
+    results = [calc_E_cfxn(atom,[[0,0,0]],atoms[atom]) for atom in atoms]
 else:
     results = [calc_E_postpbe(atom,[[0,0,0]],atoms[atom],functional) for atom in atoms]
 
