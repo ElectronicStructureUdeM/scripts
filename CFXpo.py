@@ -203,8 +203,15 @@ class CFXN(ModelXC):
                                                 self.kf[gridID],self.eps_xc_PBE[gridID])
         
         #for jx exact
-        self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
-                                                  self.eps_x_exact_down[gridID])
+        #self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
+        #                                          self.eps_x_exact_down[gridID])
+        kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
+        kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
+        self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],self.br_a_up[gridID]/kfa,
+                                        self.br_b_up[gridID]*kfa,self.br_c_up[gridID]/self.rho_up[gridID],0.,
+                                        self.br_a_down[gridID]/kfb,self.br_b_down[gridID]*kfb,
+                                        self.br_c_down[gridID]/self.rho_down[gridID],0)
+        #print(self.JX_Exact)
         #to calculate C and energy 
         m1 = self.moment_JX_E(self.E,1,self.JX_Exact)
         m2 = self.moment_JX_E(self.E,2,self.JX_Exact)
@@ -221,7 +228,8 @@ class CFXN(ModelXC):
     def calc_Exc_cfxn(self):
         sum=0.
         for gridID in range(self.n_grid):
-            sum+=self.weights[gridID]*self.rho_tot[gridID]*self.calc_eps_xc_cfxn(gridID)
+            if self.rho_tot[gridID]>1e-8:
+                sum+=self.weights[gridID]*self.rho_tot[gridID]*self.calc_eps_xc_cfxn(gridID)
         return sum
 
     def calc_Etot_cfxn(self):
