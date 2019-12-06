@@ -84,8 +84,6 @@ class CFXN(ModelXC):
             br_a_down,br_b_down,br_c_down,br_d_down=(0.,0.,0.,0.)
         else:
             br_a_down,br_b_down,br_c_down,br_d_down=(br_a_up,br_b_up,br_c_up,br_d_up)
-        if (br_a_up<0 or br_b_up<0 or br_a_down<0 or br_b_down<0):
-            exit("negative a or b in BR parameters")
         return  brholedtot(self.y_values,self.zeta[gridID],br_a_up,br_b_up,br_c_up,br_d_up,
                                 br_a_down,br_b_down,br_c_down,br_d_down)
 
@@ -239,29 +237,29 @@ class CFXN(ModelXC):
         
         #for jx exact
         #For cfxN begin
-        #self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
-        #                                          self.eps_x_exact_down[gridID])
+        self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
+                                                  self.eps_x_exact_down[gridID])
         # for cfxn end
 
-        #for cfx begin
-        kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
-        kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
-        br03_a_up = self.br_a_up[gridID]/kfa
-        br03_b_up = self.br_b_up[gridID]*kfa
-        br03_c_up = self.br_c_up[gridID]/self.rho_up[gridID]
-        if self.mol.nelectron>1:
-            br03_a_down = self.br_a_down[gridID]/kfb
-            br03_b_down = self.br_b_down[gridID]*kfb
-            br03_c_down = self.br_c_down[gridID]/self.rho_down[gridID]
-        else:
-            br03_a_down=0.
-            br03_b_down=0.
-            br03_c_down=0.
-        self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
-                                        br03_b_up,br03_c_up,0.,
-                                        br03_a_down,br03_b_down,
-                                        br03_c_down,0)
-        #for cfx end
+        ##for cfx begin
+        #kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
+        #kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
+        #br03_a_up = self.br_a_up[gridID]/kfa
+        #br03_b_up = self.br_b_up[gridID]*kfa
+        #br03_c_up = self.br_c_up[gridID]/self.rho_up[gridID]
+        #if self.mol.nelectron>1:
+        #    br03_a_down = self.br_a_down[gridID]/kfb
+        #    br03_b_down = self.br_b_down[gridID]*kfb
+        #    br03_c_down = self.br_c_down[gridID]/self.rho_down[gridID]
+        #else:
+        #    br03_a_down=0.
+        #    br03_b_down=0.
+        #    br03_c_down=0.
+        #self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
+        #                                br03_b_up,br03_c_up,0.,
+        #                                br03_a_down,br03_b_down,
+        #                                br03_c_down,0)
+        ##for cfx end
         
         #to calculate C and energy 
         m1 = self.moment_JX_E(self.E,1,self.JX_Exact)
