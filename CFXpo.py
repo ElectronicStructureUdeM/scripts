@@ -59,7 +59,7 @@ class CF(ModelXC):
         a = a/kf
         b = b*kf
         c = c/rho
-        d = d/kf
+        d = d/kf**4
         return a,b,c,d
     
     def calc_jx_approx(self,gridID,eps_x_up,eps_x_down):
