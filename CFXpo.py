@@ -9,12 +9,13 @@ from modelXC import ModelXC
 from locEs import *
 from BRx import *
 
-class CFXN(ModelXC):
-    def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1,ASE=False):
+class CF(ModelXC):
+    def __init__(self,molecule,positions,spin,method,approx='pbe,pbe',
+                    basis='6-311+g2dp.nw',num_threads=1,ASE=False):
         super().__init__(molecule,positions,spin,approx,basis,num_threads,ASE)
         # to obtain exks energy densities
         self.calc_eps_xks_post_approx() 
-
+        self.method=method
         # to obtain LSD energy densities
         self.calc_eps_xc_post_approx('LDA,PW_mod')
         self.eps_x_LSD_up = self.eps_x_up
@@ -212,9 +213,9 @@ class CFXN(ModelXC):
         self.eps_xc_PBE_calc=2.*np.pi*rho/kf**2*(self.A*m1+self.B*m2+C*m3+D*m5)
         return C,D
 
-    def calc_eps_xc_cfxn(self,gridID):
+    def calc_eps_xc_cf(self,gridID):
         """
-        To calculate the XC energy density per particle for CFXN.
+        To calculate the XC energy density per particle for CF.
 
         Input:
             gridID: current grid point
@@ -237,29 +238,32 @@ class CFXN(ModelXC):
         
         #for jx exact
         #For cfxN begin
-        self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
+        if self.method=="cfxn":
+            self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
                                                   self.eps_x_exact_down[gridID])
         # for cfxn end
-
-        ##for cfx begin
-        #kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
-        #kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
-        #br03_a_up = self.br_a_up[gridID]/kfa
-        #br03_b_up = self.br_b_up[gridID]*kfa
-        #br03_c_up = self.br_c_up[gridID]/self.rho_up[gridID]
-        #if self.mol.nelectron>1:
-        #    br03_a_down = self.br_a_down[gridID]/kfb
-        #    br03_b_down = self.br_b_down[gridID]*kfb
-        #    br03_c_down = self.br_c_down[gridID]/self.rho_down[gridID]
-        #else:
-        #    br03_a_down=0.
-        #    br03_b_down=0.
-        #    br03_c_down=0.
-        #self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
-        #                                br03_b_up,br03_c_up,0.,
-        #                                br03_a_down,br03_b_down,
-        #                                br03_c_down,0)
-        ##for cfx end
+        elif self.method=="cfx":
+            #for cfx begin
+            kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
+            kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
+            br03_a_up = self.br_a_up[gridID]/kfa
+            br03_b_up = self.br_b_up[gridID]*kfa
+            br03_c_up = self.br_c_up[gridID]/self.rho_up[gridID]
+            if self.mol.nelectron>1:
+                br03_a_down = self.br_a_down[gridID]/kfb
+                br03_b_down = self.br_b_down[gridID]*kfb
+                br03_c_down = self.br_c_down[gridID]/self.rho_down[gridID]
+            else:
+                br03_a_down=0.
+                br03_b_down=0.
+                br03_c_down=0.
+            self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
+                                            br03_b_up,br03_c_up,0.,
+                                            br03_a_down,br03_b_down,
+                                            br03_c_down,0)
+            #for cfx end
+        else:
+            exit("Method does not exist")
         
         #to calculate C and energy 
         m1 = self.moment_JX_E(self.E,1,self.JX_Exact)
@@ -275,7 +279,7 @@ class CFXN(ModelXC):
 
         return self.eps_xc_calc
    
-    def calc_Exc_cfxn(self):
+    def calc_Exc_cf(self):
         """
         To calculate the total XC energy.
 
@@ -285,24 +289,22 @@ class CFXN(ModelXC):
         sum=0.
         for gridID in range(self.n_grid):
             if self.rho_tot[gridID]>1e-8:
-                sum+=self.weights[gridID]*self.rho_tot[gridID]*self.calc_eps_xc_cfxn(gridID)
+                sum+=self.weights[gridID]*self.rho_tot[gridID]*self.calc_eps_xc_cf(gridID)
         return sum
 
-    def calc_Etot_cfxn(self):
+    def calc_Etot_cf(self):
         """
         To calculate the total energy
 
         Return
         """
-        Exc = self.calc_Exc_cfxn()
+        Exc = self.calc_Exc_cf()
         Etot = self.mf.e_tot-self.approx_Exc+Exc
         #print(Etot)
         return Etot
 
 
 
-#test = CFXN('Ar',[],0,basis = 'cc-pvtz',ASE=False)
-#test.calc_Etot_cfxn()
 
 
 
