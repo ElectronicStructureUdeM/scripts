@@ -32,8 +32,8 @@ class CF(ModelXC):
         self.eps_xc_PBE = (self.eps_x_PBE_up*self.rho_up+self.eps_x_PBE_down*
                                 self.rho_down)/self.rho_tot + self.eps_c_PBE
         #for the integration grid
-        min_y = 1e-10
-        max_y = 20.0
+        min_y = 0.
+        max_y = 100.0
         gauleg_deg = 2000
         y_grid, self.y_weights =  np.polynomial.legendre.leggauss(gauleg_deg)
         self.y_values = 0.5*(y_grid + 1)*(max_y - min_y) + min_y
