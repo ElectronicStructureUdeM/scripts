@@ -5,9 +5,9 @@ from pyscf import lib
 from matplotlib import pyplot as plt
 import sys
 import re
-from LmodelXC import ModelXC
+from modelXC import ModelXC
 from locEs import *
-from LBRx import *
+from BRx import *
 
 class CF(ModelXC):
     def __init__(self,molecule,positions,spin,method,approx='pbe,pbe',
