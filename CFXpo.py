@@ -16,6 +16,7 @@ class CF(ModelXC):
         # to obtain exks energy densities
         self.calc_eps_xks_post_approx() 
         self.method=method
+        self.lambd=0.225
         # to obtain LSD energy densities
         self.calc_eps_xc_post_approx('LDA,PW_mod')
         self.eps_x_LSD_up = self.eps_x_up
@@ -222,27 +223,28 @@ class CF(ModelXC):
         Return:
             epsilonXC calculated
         """
-        # for jx lsd
-        self.JX_LSD = self.calc_jx_approx(gridID,self.eps_x_LSD_up[gridID],self.eps_x_LSD_down[gridID])
-        # for fc lsd
         self.A = self.calc_A(self.rs[gridID],self.zeta[gridID])
         self.B = self.calc_B(self.rs[gridID],self.zeta[gridID])
-        self.E=self.calc_E(self.rho_tot[gridID],self.kf[gridID],self.eps_xc_LSD[gridID])
+        if self.method=="cfx" or self.method=="cfxn" or self.method=="cfxav":
+         # for jx lsd
+         self.JX_LSD = self.calc_jx_approx(gridID,self.eps_x_LSD_up[gridID],self.eps_x_LSD_down[gridID])
+         # for fc lsd
+         self.E=self.calc_E(self.rho_tot[gridID],self.kf[gridID],self.eps_xc_LSD[gridID])
 
-        #for jx pbe
-        self.JX_PBE = self.calc_jx_approx(gridID,self.eps_x_PBE_up[gridID],self.eps_x_PBE_down[gridID])
+         #for jx pbe
+         self.JX_PBE = self.calc_jx_approx(gridID,self.eps_x_PBE_up[gridID],self.eps_x_PBE_down[gridID])
 
-        #for C,D pbe
-        self.C,self.D=self.calc_CD(self.rho_tot[gridID],
+         #for C,D pbe
+         self.C,self.D=self.calc_CD(self.rho_tot[gridID],
                                                 self.kf[gridID],self.eps_xc_PBE[gridID])
         
-        #for jx exact
-        #For cfxN begin
+         #for jx exact
+         #For cfxN begin
         if self.method=="cfxn":
             self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
                                                   self.eps_x_exact_down[gridID])
         # for cfxn end
-        elif self.method=="cfx":
+        elif self.method=="cfx" or self.method=="cf3" or self.method=="cfxav":
             #for cfx begin
             kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
             kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
@@ -257,13 +259,25 @@ class CF(ModelXC):
                 br03_a_down=0.
                 br03_b_down=0.
                 br03_c_down=0.
-            self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
+            if self.method=="cfx" or self.method=="cf3":
+             self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
+                                            br03_b_up,br03_c_up,0.,
+                                            br03_a_down,br03_b_down,
+                                            br03_c_down,0)
+            if self.method=="cfxav":
+             self.JX_Exact = self.lambd*self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
+                                                  self.eps_x_exact_down[gridID])
+             self.JX_Exact = self.JX_Exact + (1.0-self.lambd)*brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
                                             br03_b_up,br03_c_up,0.,
                                             br03_a_down,br03_b_down,
                                             br03_c_down,0)
             #for cfx end
         else:
             exit("Method does not exist")
+
+        if self.method=='cf3':
+       	 self.E=0.0
+         self.D=0.0
         
         #to calculate C and energy 
         m1 = self.moment_JX_E(self.E,1,self.JX_Exact)
