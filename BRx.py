@@ -66,7 +66,7 @@ def brhparam(Q,rho,epsx):
     c = np.zeros(size)
     n = np.zeros(size)
     for gridID in range(size):
-        if rho[gridID] > 1e-10:
+        if rho[gridID] > 6e-10:
          Qp = Q[gridID]/(rho[gridID]**2) * epsx[gridID]
          sol = scipy.optimize.root_scalar(findxbr, args=(Qp), xtol=1e-10, bracket=[1e-8,1000] , method='brentq')
          sol = sol.root
