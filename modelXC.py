@@ -82,9 +82,10 @@ class ModelXC:
             self.D_up = self.tau_up*2-(1./4.)*grad_squared_up/self.rho_up
             self.Q_up = 1./6.*(self.lap_up-2.*self.D_up) 
             #
-            grad_squared_down = self.dx_rho_down**2+self.dy_rho_down**2+self.dz_rho_down**2
-            self.D_down = self.tau_down*2-(1./4.)*grad_squared_down/self.rho_down
-            self.Q_down = 1./6.*(self.lap_down-2.*self.D_down)           
+            if self.mol.nelectron>1:
+                grad_squared_down = self.dx_rho_down**2+self.dy_rho_down**2+self.dz_rho_down**2
+                self.D_down = self.tau_down*2-(1./4.)*grad_squared_down/self.rho_down
+                self.Q_down = 1./6.*(self.lap_down-2.*self.D_down)           
         self.rho_tot = self.rho_up+self.rho_down
         self.zeta = (self.rho_up-self.rho_down)/self.rho_tot
         self.kf = (3.*np.pi**2*self.rho_tot)**(1./3.)
@@ -148,7 +149,10 @@ class ModelXC:
                 self.ex_exact_down[gridID] = self.compute_ex_exact(self.ao_values[0,gridID,:],
                                                 self.dm_down,self.coords[gridID])
         self.eps_x_exact_up = self.ex_exact_up/self.rho_up
-        self.eps_x_exact_down = self.ex_exact_down/self.rho_down
+        if self.mol.nelectron>1:
+            self.eps_x_exact_down = self.ex_exact_down/self.rho_down
+        else:
+            self.eps_x_exact_down=np.zeros(self.n_grid)   
     def calc_Exks_post_approx(self):
         """
         Function to compute the total exchange energy of a molecule with 
