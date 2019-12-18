@@ -5,7 +5,6 @@ from numba import vectorize, float64
 import matplotlib.pyplot as plt
 from scipy import integrate
 import h5py
-from moment_jx_E import *
 class Fxc(ModelXC):
     """
     Simple one parameters exchange factor: fx=np.exp(-gamma*u**2)
@@ -33,60 +32,70 @@ class Fxc(ModelXC):
         self.eps_xc_post_approx = self.exc_post_approx/self.rho_tot
 
 
-    @vectorize([float64(float64,float64)])
-    def calc_fx(gamma,u_gamma):
+    @vectorize([float64(float64,float64,float64,float64)])
+    def calc_fx2(alpha,beta,u1,u2):
         """
-        Calculate (-1)*exp(-gamma*u_gamma)
+        Calculate (-1)*exp(-alpha(u1+beta*u2)^2)
         input:
 
-            gamma:float
+            alpha:float
                 parameter
+            beta:float
+                parameter
+            u1: array of float:
+                u values
 
-            u_gamma:float
-                sphere radius, which could be to some power (usually u**2)
 
         """
-        return (-1.)*np.exp(-gamma*u_gamma)
+        #return (-1.)*np.exp(-alpha*(beta*u1+u2)**2)
+        return -1./(1.+np.exp(alpha*(u1*beta*u2)**2))
 
-    def find_gamma_epsx(self,gamma,epsilonX,rhoRU):
+    def find_alpha_beta(self,params,epsilonX,norm,rhoRU):
         """
-        Target function to find gamma by reproducing epsilon_x ks using a root finding algorithm
+        Target function to find alpha by reproducing epsilon_x 
+        and beta using a root finding algorithm
         Input:
-            gamma:float
-                parameter
+            params:array of float
+                alpha is the first element and beta the second
             epsilonX: float
                 exchange energy density to reproduce
-            rhoRU: array of float
-                spherically non local averaged density
+            norm: float
+                normalisation
+            rhoru: array of float
+                all the rho(r,u) for a r
         return:
-            0 = int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
+            array with:
+               int_0^maxu 2*pi*u*rho(r,u)*fx2 du - epsilonX
+               and
+               int_0^maxu 4*pi*u**2*rho(r,u)*fx2 du - norm
+
         """
-        fx1 = self.calc_fx(gamma,self.ux_pow[2])
-        #return 2.*np.pi*integrate.simps(self.ux_pow[1]*rhoRU*fx2,x=self.ux_pow[1],even="first")-epsilonX
-        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx1*rhoRU)-epsilonX
+        fx2 = self.calc_fx2(params[0],params[1],self.ux_pow[1],self.ux_pow[2])
+        constraint1 = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx2*rhoRU)-epsilonX
+        constraint2 = 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx2*rhoRU)-norm
+        return np.array([constraint1,constraint2])
 
 
-    def calc_gamma(self,rhoRU,Q,lap,rho,epsilonX):
+    def calc_fx(self,epsilonX,norm,rhoRU):
         """
         To calculate gamma using a root finding algorithm to reproduce exact exchange energy density
         input:
             epsilonX:float
                 exchange energy density to reproduce
+            norm:float
+                normalisation to reproduce
             rhoRU: array of float
                 spherically averaged energy density
-            Q: float
-                -curvature
-            lap:float
-                laplacian of the density
-            rho:float
-                density
         output:
             fx:array of float
                 the exchange factor for each u
         """
-        gamma= scipy.optimize.brentq(self.find_gamma_epsx,-5e-1,100,args=(epsilonX,rhoRU))
-        fx = self.calc_fx(gamma,self.ux_pow[2])
-        return fx
+        result= scipy.optimize.root(self.find_alpha_beta,[1,1],args=(epsilonX,norm,rhoRU))
+        print(result)
+        if result.success==False:
+            exit("root finding failed")
+        fx2 = self.calc_fx2(result.x[0],result.x[1],self.ux_pow[1],self.ux_pow[2])
+        return fx2
 
     ####for correlation######################
     def calc_A(self,rs,zeta):
@@ -129,19 +138,6 @@ class Fxc(ModelXC):
         fc = (A+B*u+C*u**2+D*u**4)*exp(-E*u**2)
         """
         return (A+B*self.ux_pow[1]+C*self.ux_pow[2]+D*self.ux_pow[4])*np.exp(-E*self.ux_pow[2])
-    def find_E(self,E,zeta,gamma,A,B,epsilonXC,rho,kf):
-        """
-        TO calculate E, by reproducing an epsilonXC from an approximation
-        """
-        m1 = moment1JXE(zeta,gamma,E)
-        m2 = moment2JXE(zeta,gamma,E)
-        m3 = moment3JXE(zeta,gamma,E)
-        m4 = moment4JXE(zeta,gamma,E)
-        C= -(3.*np.pi/4.+A*m2+B*m3)/m4
-
-        eps_xc_calc = 2.*np.pi*rho/(kf**2)*(A*m1+B*m2+C*m3)
-        print(eps_xc_calc-epsilonXC,E)
-        return eps_xc_calc-epsilonXC
 
     def calc_exc_fxc(self,gridID):
         """
@@ -154,31 +150,17 @@ class Fxc(ModelXC):
         B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
 
         #for exact exchange
-        self.fx_up=self.calc_gamma(self.rhoRUA[gridID],self.Q_up[gridID],
-                                                self.lap_up[gridID],self.rho_up[gridID],
-                                                epsilonX=self.eps_x_exact_up[gridID])
+        self.fx_up=self.calc_fx(self.eps_x_exact_up[gridID],-1,self.rhoRUA[gridID])
         if self.mol.nelectron==1:
             self.fx_down=self.fx_up*0
         else:
-            self.fx_down = self.calc_gamma(self.rhoRUB[gridID],self.Q_down[gridID],
-                                                    self.lap_down[gridID],self.rho_down[gridID],
-                                                    epsilonX=self.eps_x_exact_down[gridID])
+            self.fx_down = self.calc_fx(self.eps_x_exact_down[gridID],-1,self.rhoRUB[gridID])
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
-        #calculate E
-        GAMMALOC=4./9.
-        E=scipy.optimize.brentq(self.find_E,1e-20,500,args=(self.zeta[gridID],GAMMALOC,
-                                    A,B/self.kf[gridID],self.eps_xc_post_approx[gridID],
-                                    self.rho_tot[gridID],self.kf[gridID]))*self.kf[gridID]**2
-        print(E)
         #renormalize
         #self.calc_C()
         
-
-        #to calculate energy
-        #eps_xc = 2.*np.pi*integrate.simps(self.ux_pow[1]*self.fc*self.rho_x,
-        #                                    x=self.ux_pow[1],even="first")
-        self.fc = self.calc_fc5(A,B,0.,0.,E)
+        self.fc = self.calc_fc5(A,B,0.,0.,0.)
     
         eps_xc = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.fc*self.rho_x)
         return  eps_xc*self.rho_tot[gridID]
