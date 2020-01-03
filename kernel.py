@@ -5,6 +5,7 @@ from numba import vectorize,float64
 from scipy.integrate import quad
 from scipy import interpolate
 
+import matplotlib.pyplot as plt
 import time
 
 class KSKernel:
@@ -80,9 +81,9 @@ class KSKernel:
         self.mf.grids.radi_method = dft.radi.delley
         self.mf.xc = functional
         self.mf.kernel()
-
         self.approx_Exc = self.mf.get_veff().exc
 
+        print('XC = {:.12e}'.format(self.approx_Exc))
         #for stuff related to grid
         self.coords = self.mf.grids.coords
         self.weights = self.mf.grids.weights
@@ -151,17 +152,16 @@ class KSKernel:
         return (self.rho_up + self.rho_down)
 
     def GetParams(self):
-        mgga_up = [self.rho_up, self.dx_rho_up, self.dy_rho_up, self.dz_rho_up, self.laprho_up, self.tau_up]
-        mgga_down = [self.rho_down, self.dx_rho_down, self.dy_rho_down, self.dz_rho_down, self.laprho_down, self.tau_down]
-        return mgga_up, mgga_down
+        params_up = [self.rho_up, self.dx_rho_up, self.dy_rho_up, self.dz_rho_up, self.laprho_up, self.tau_up]
+        params_down = [self.rho_down, self.dx_rho_down, self.dy_rho_down, self.dz_rho_down, self.laprho_down, self.tau_down]
+        return params_up, params_down
 
     def ScaleParams(self, value):
         self.rho_up     = value**-3.0 * self.rho_up
         self.rho_down   = value**-3.0 * self.rho_down
 
-    def CalculateEpsilonC(self, functional, params):
+    def CalculateEpsilonC(self, functional, params_up, params_down):
 
-        params_up, params_down = params
         eps_c = 0.0
         vc = 0.0
         eps_c, vc = dft.libxc.eval_xc("," + functional, [params_up, params_down], spin=5)[:2]
@@ -171,7 +171,7 @@ class KSKernel:
 
         eps_x = 0.0
         vx = 0.0
-        zeros = np.zeros(self.ngrid) # also used so we can exact up and down energies densites
+        zeros = np.zeros(self.ngrid)
         eps_x, vx = dft.libxc.eval_xc(functional + ",", [params, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
         return eps_x, vx
 
@@ -201,6 +201,32 @@ class KSKernel:
         return eps_x_up, vx_up, eps_x_down, vx_down, eps_c, vc
 
 
+    def CalculateTotalX(self, functional, params_up, params_down):
+
+        Ex_up = 0.0
+        Ex_down = 0.0
+        
+        rho_up = params_up[0]
+        rho_down = params_down[0]
+
+        eps_x_up, vx_up = self.CalculateEpsilonX(functional, params_up)
+        Ex_up = np.einsum("i,i,i->", eps_x_up, rho_up, self.weights)
+
+        if np.all(self.rho_down) > 0.0:
+            eps_x_down, vx_down = self.CalculateEpsilonX(functional, params_down)
+            Ex_down = np.einsum("i,i,i->", eps_x_down, rho_down, self.weights)
+
+        return Ex_up + Ex_down
+
+    def CalculateTotalC(self, functional, params_up, params_down):
+        
+        rho_up = params_up[0]
+        rho_down = params_down[0]
+        rho = rho_up + rho_down
+
+        eps_c,vc = self.CalculateEpsilonC(functional, params_up, params_down)
+        return np.einsum("i,i,i->", eps_c, rho, self.weights)
+
     def CalculateTotalXC(self, functional, params_up, params_down):
         """
         To calculate the total exchange-correlation energy for a functional
@@ -209,19 +235,14 @@ class KSKernel:
             functional:string
                 functional in pyscf format
         """
-        Ex_up = 0.0
-        Ex_down = 0.0
+        exchange_functional, correlation_functional = functional.split(",")
+        Ex = 0.0
         Ec = 0.0
 
-        eps_x_up, vx_up, eps_x_down, vx_down, eps_c, vc = self.CalculateEpsilonXC(functional, params_up, params_down)
-        Ex_up   = np.einsum("i,i,i->", eps_x_up, self.rho_up, self.weights)
+        Ex = self.CalculateTotalX(exchange_functional, params_up, params_down)
+        Ec = self.CalculateTotalC(correlation_functional, params_up, params_down)
 
-        if np.all(self.rho_down) > 0.0:
-            Ex_down = np.einsum("i,i,i->", eps_x_down, self.rho_down, self.weights)
-        
-        Ec = np.einsum("i,i,i->", eps_c, self.rho_tot, self.weights)
-        print(Ex_up, Ex_down, Ec)
-        return (Ex_up + Ex_down + Ec)
+        return (Ex + Ec)
 
     def CalculateTotalEnergy(self, functional, params_up, params_down):
         """
@@ -236,116 +257,135 @@ class KSKernel:
         Exc = self.CalculateTotalXC(functional, params_up, params_down)
         return self.mf.e_tot + Exc
 
-def ScaledXC(lm):
-
-    params_up, params_down = kernel.GetParams()
-    rho_up = params_up[0]
-    rho_down = params_down[0]
-
-    x_up = kernel.CalculateEpsilonX('LDA', params_up)[0]
-    if np.all(rho_down) > 0.0:
-        x_down = kernel.CalculateEpsilonX('LDA', params_down)[0]
-    c = kernel.CalculateEpsilonC('PW_mod', [params_up, params_down])[0]
-
-    xpp_up = x_up / rho_up
-    xpp_down = np.zeros(xpp_up.shape[0])
-    if np.all(rho_down) > 0.0:
-        xpp_down = x_down / rho_down
-    cpp = c / (rho_up + rho_down)
-    return (xpp_up + xpp_down + cpp)
-
 mol = gto.Mole()
-mol.atom = 'H 0 0 0'
+mol.atom = 'N 0 0 0'
 mol.basis = 'cc-pvtz'
-mol.spin = 1
+mol.spin = 3
 mol.charge = 0
 mol.build()
 
 kernel = KSKernel()
-kernel.CalculateKSKernel(mol, 'pbe,pbe')
+kernel.CalculateKSKernel(mol, 'LDA,PW_MOD')
 
 params_up, params_down = kernel.GetParams()
 weights = kernel.GetWeights()
 rho = kernel.GetRho()
+print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+TotalX = kernel.CalculateTotalX('LDA', params_up, params_down)
+TotalC = kernel.CalculateTotalC('LDA_C_PW_MOD', params_up, params_down)
+TotalXC = kernel.CalculateTotalXC('LDA,LDA_C_PW_MOD', params_up, params_down)
 
-TotalXC = kernel.CalculateTotalXC('LDA,PW_mod', params_up, params_down)
-print('XC = {:.12e}'.format(TotalXC))
+print('X = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(TotalX, TotalC, TotalXC))
 
 ###############################################################################
 def ScaleXC(lm):
-    kernel.ScaleParams(lm)
+
     params_up, params_down = kernel.GetParams()
+
     rho_up = params_up[0]
     rho_down = params_down[0]
+    
+    scaled_rho_up = lm**(-3.0) * rho_up
+    params_up[0] = scaled_rho_up
+
+    scaled_rho_down = lm**(-3.0) * rho_down
+    params_down[0] = scaled_rho_down
+
     x_up = kernel.CalculateEpsilonX('LDA', params_up)[0]
+    # xpp_up = x_up / scaled_rho_up
+
+    x_down = np.zeros(x_up.shape[0])
     if np.all(rho_down) > 0.0:
         x_down = kernel.CalculateEpsilonX('LDA', params_down)[0]
-    c = kernel.CalculateEpsilonC('PW_mod', [params_up, params_down])[0]
-    xpp_up = x_up / rho_up
-    xpp_down = np.zeros(xpp_up.shape[0])
-    if np.all(rho_down) > 0.0:
-        xpp_down = x_down / rho_down
-    cpp = c / (rho_up + rho_down)
-    xcpp = (xpp_up + xpp_down + cpp)
-    return xcpp
+        # xpp_down = x_down / scaled_rho_down
+        
+    c = kernel.CalculateEpsilonC('LDA_C_PW_MOD', params_up, params_down)[0]
+    
+    # cpp = c / (scaled_rho_up + scaled_rho_down)
+    xc = (x_up * rho_up + x_down * rho_down) / (rho_up + rho_down) + c
+    return xc
 ###############################################################################
 
 # prepare scaling parameters
-lmbd = np.arange(0.0, 1.0, 0.1)
+lmbd = np.arange(0.0, 0.2, 0.02)
+lmbd = np.append(lmbd, np.arange(0.2, 1.05, 0.05))
 npoints = len(lmbd)
-lmbd[0] = 1.0e-3
-delta = 1.0e-4
+
+lmbd[0] = 1.0e-6
+delta = 1.0e-7
 
 # prepare matrix for vectorization ( weights, rho, excpp )
-data = np.ndarray(shape=(weights.shape[0], 3), dtype=float)
-data[:,0] = weights.T 
-data[:,1] = rho.T
-data[:,2] = np.zeros(rho.shape[0])
+# data = np.ndarray(shape=(weights.shape[0], 3), dtype=float)
+# data[:,0] = weights.T 
+# data[:,1] = rho.T
+# data[:,2] = np.zeros(rho.shape[0])
 
 # weight, rho, xcpp = data # unpack the data from the ith-row
 
 def XCPPLM():
   
-    xcpplm = np.ndarray(shape=(weights.shape[0], npoints), dtype=float) # an array of xc per particle lambda dependent with shape n,npoints
+    xcpplm = np.zeros(shape=(weights.shape[0], npoints), dtype=float) # an array of xc per particle lambda dependent with shape n,npoints
                                                                         # where n is the number of grid points
     # Calculate the xc per particle for every point
     for i, lm in enumerate(lmbd): # ToDo check if enumerate is fast enough with arange
 
         # This block is for f(l + d)
         lmpd = lm + delta
-        xc_lmpd =  lmpd * lmpd * ScaledXC(lmpd)
+        xc_lmpd =  lmpd * lmpd * ScaleXC(lmpd)            
+        if i == 0:
 
-        # This block is for f(l - d)
-        lmmd = lm - delta
-        xc_lmmd = lmmd * lmmd * ScaledXC(lmmd)
+        else:  
+            # This block is for f(l - d)
+            lmmd = lm - delta
+            xc_lmmd = lmmd * lmmd * ScaleXC(lmmd)
 
-        # store the xc per particle lambda dependent in the array xcpplm
-        xcpplm[:,i] = (xc_lmpd - xc_lmmd) / (2.0 * delta)
-
+            # store the xc per particle lambda dependent in the array xcpplm
+            xcpplm[:,i] = (xc_lmpd - xc_lmmd) / (2.0 * delta)
+    
     return xcpplm 
 
 def XCPP(xcpplm):
-
+    # print(xcpplm)
+    # exit()
     # Calculate the interpolation
     tck = interpolate.splrep(lmbd, xcpplm, k=3, s=0.) # k is the degree
     xnew = np.linspace(lmbd[0], 1.0, num=10000) # prepare x-axis
     yinterp = interpolate.splev(xnew, tck, der=0) # interpolate the ac
-    xcavg = interpolate.splint(1.0e-8, 1.0e0, tck) # integrate over lambda
+    # if np.abs(xcpplm[-1]) > 800.0:
+    # print(xcpplm, lmbd[-1])
+    # plt.plot(xnew, yinterp, label = "CFX")
+    # plt.show(block = False)
+    # plt.pause(0.000001)
+    xcavg = interpolate.splint(lmbd[0], 1.0, tck) # integrate over lambda
     return xcavg
 
-times = np.zeros(shape=(10,1))
-for i in enumerate(arange(0, 9)):
-    start_time = time.time()
-    xcpplm_arr = XCPPLM()
-    times((time.time() - start_time))
+xcpplm_arr = XCPPLM()
 
-eps_xcavg = np.apply_along_axis(XCPP, 1, xcpplm_arr)
+# print(xcpplm_arr)
+# print('---')
+# print(xcpplm_arr[0,:])
+# print('---')
+eps_xcavg = np.array(
+    [XCPP(row) for row in xcpplm_arr]
+)
+
+# eps_xcavg = np.apply_along_axis(XCPP, 1, xcpplm_arr)
+
+# times = np.zeros(shape=(10,1))
+# for i, j in enumerate(np.arange(0, 9)):
+#     start_time = time.time()
+#     # eps_xcavg = np.apply_along_axis(XCPP, 1, xcpplm_arr)
+#     # eps_xcavg = np.array(
+#     #     [XCPP(row) for row in xcpplm_arr]
+#     # )    
+#     times[i] = ((time.time() - start_time))
+#     print(times[i])
+# print(times.sum()/10.0)
 
 # eps_xcavg = np.array(
 #     [XCPP(row) for row in xcpplm_arr]
 # )
 
-print(eps_xcavg)
-# xclm = np.sum(weights * rho * eps_xcavg)
-# print('XC = {:.12e}'.format(xclm))
+xclm = np.sum(weights * rho * eps_xcavg)
+print('AC XC = {:.12e} AVG XC = {:.12e}, Error = {:.12e}'.format(xclm, TotalXC, (TotalXC - xclm)))
 
