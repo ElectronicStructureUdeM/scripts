@@ -35,7 +35,7 @@ class Fxc(ModelXC):
     @vectorize([float64(float64,float64,float64,float64)])
     def calc_fx2(alpha,beta,u1,u2):
         """
-        Calculate (-1)*exp(-alpha(u1+beta*u2)^2)
+        Calculate fx2
         input:
 
             alpha:float
@@ -48,35 +48,32 @@ class Fxc(ModelXC):
 
         """
         #return (-1.)*np.exp(-alpha*(beta*u1+u2)**2)
-        return -1./(1.+np.exp(alpha*(u1*beta*u2)**2))
+        return -1./(1.+alpha*(u1+beta*u2)**2)
 
-    def find_alpha_beta(self,params,epsilonX,norm,rhoRU):
+    def find_alpha(self,alpha,beta,epsilonX,rhoRU):
         """
         Target function to find alpha by reproducing epsilon_x 
-        and beta using a root finding algorithm
+        and beta is a constant which will normalize the hole in the LSD limit
         Input:
-            params:array of float
-                alpha is the first element and beta the second
+            alpha:float
+                parameter
+            beta: float
+                parameter
             epsilonX: float
                 exchange energy density to reproduce
-            norm: float
-                normalisation
+
             rhoru: array of float
                 all the rho(r,u) for a r
         return:
             array with:
                int_0^maxu 2*pi*u*rho(r,u)*fx2 du - epsilonX
-               and
-               int_0^maxu 4*pi*u**2*rho(r,u)*fx2 du - norm
 
         """
-        fx2 = self.calc_fx2(params[0],params[1],self.ux_pow[1],self.ux_pow[2])
-        constraint1 = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx2*rhoRU)-epsilonX
-        constraint2 = 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx2*rhoRU)-norm
-        return np.array([constraint1,constraint2])
+        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
+        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx2*rhoRU)-epsilonX
 
 
-    def calc_fx(self,epsilonX,norm,rhoRU):
+    def calc_fx(self,epsilonX,rhoR,rhoRU):
         """
         To calculate gamma using a root finding algorithm to reproduce exact exchange energy density
         input:
@@ -90,11 +87,10 @@ class Fxc(ModelXC):
             fx:array of float
                 the exchange factor for each u
         """
-        result= scipy.optimize.root(self.find_alpha_beta,[1,1],args=(epsilonX,norm,rhoRU))
-        print(result)
-        if result.success==False:
-            exit("root finding failed")
-        fx2 = self.calc_fx2(result.x[0],result.x[1],self.ux_pow[1],self.ux_pow[2])
+        kf = (3.*np.pi**2*rhoR)**(1./3.)
+        beta = 1.1540708018906927*kf
+        alpha= scipy.optimize.brentq(self.find_alpha,0,1000,args=(beta,epsilonX,rhoRU))
+        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
         return fx2
 
     ####for correlation######################
@@ -150,19 +146,33 @@ class Fxc(ModelXC):
         B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
 
         #for exact exchange
-        self.fx_up=self.calc_fx(self.eps_x_exact_up[gridID],-1,self.rhoRUA[gridID])
+        
         if self.mol.nelectron==1:
-            self.fx_down=self.fx_up*0
+            self.fx_up=-1.
+            self.fx_down=0.
+        elif self.mol.nelectron==2:
+            self.fx_up=-1.
+            self.fx_down=-1.
+        elif self.mol.nelectron==3:
+            self.fx_up=self.calc_fx(self.eps_x_exact_up[gridID],self.rho_up[gridID],self.rhoRUA[gridID])
+            self.fx_down=-1.
         else:
-            self.fx_down = self.calc_fx(self.eps_x_exact_down[gridID],-1,self.rhoRUB[gridID])
+            self.fx_up=self.calc_fx(self.eps_x_exact_up[gridID],self.rho_up[gridID],self.rhoRUA[gridID])
+            if self.mol.spin>0:
+                self.fx_down = self.calc_fx(self.eps_x_exact_down[gridID],self.rho_down[gridID],self.rhoRUB[gridID])
+            else:
+                self.fx_down=self.fx_up
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #renormalize
-        #self.calc_C()
+        m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
+        m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
+        m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
+        m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
         
-        self.fc = self.calc_fc5(A,B,0.,0.,0.)
-    
-        eps_xc = 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.fc*self.rho_x)
+        C = (-1/(4.*np.pi)-A*m2-B*m3)/m4        
+        
+        eps_xc = 2.*np.pi*(m1*A+B*m2+C*m3)
         return  eps_xc*self.rho_tot[gridID]
 
 
