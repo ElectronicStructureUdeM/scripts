@@ -69,12 +69,12 @@ class KSKernel:
         self.Q_up = 0.0
         self.Q_down = 0.0
 
-    def CalculateKSKernel(self, mol, functional):
+    def CalculateKSKernel(self, mol):
 
         self.mf = scf.UKS(mol)
         self.mf.small_rho_cutoff = 1e-12
         self.mf.grids.radi_method = dft.radi.delley
-        self.mf.xc = functional
+        self.mf.xc = ''
         self.mf.kernel()
         self.approx_Exc = self.mf.get_veff().exc
 

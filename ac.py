@@ -9,6 +9,11 @@ import matplotlib.pyplot as plt
 
 import kernel
 
+
+class AC:
+    def __init__(self, mol, kskernel, dfa, approximation):
+
+
 ###############################################################################
 def ScaleXC(functional, lm):
     """
@@ -128,7 +133,7 @@ def CalculateTotalXC(self, functional, params_up, params_down):
 
     xclm = np.sum(weights * rho * eps_xcavg)
     print('AC XC = {:.12e} AVG XC = {:.12e}, Error = {:.12e}'.format(xclm, TotalXC, (TotalXC - xclm)))
-    
+
     return xclm
 
 def main():
