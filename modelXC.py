@@ -33,7 +33,6 @@ class ModelXC:
             atom_pos = positions[nAtom]
             molecule.append([atom,(atom_pos[0],atom_pos[1],atom_pos[2])])
             nAtom=nAtom+1
-            
         self.mol.atom=molecule
         self.mol.verbose=0
         self.mol.spin=spin

@@ -3,12 +3,12 @@ import numpy as np
 import dataset
 import sys
 from mpi4py import MPI
+from pyscf import dft,gto,lib,scf
 #mpistuff
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 total_fractions=20
-
 fractions_energies=None
 perrank=total_fractions//size
 if rank==0:
@@ -23,12 +23,15 @@ num_fractions = np.shape(fractions_energies_rank)[0]
 model=sys.argv[1]
 
 for molecule in dataset.molecules:
+#for molecule in dataset.atoms:
     comm.barrier()
     for i in range(num_fractions):
         frac = fractions_energies_rank[i,0]
         print(str(frac)+"*HF+"+str(1.-frac)+"*pbe")
         cf = CF(molecule,dataset.molecules[molecule][1],dataset.molecules[molecule][0],
-                    model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz")
+                    model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz",num_threads=1)
+        #cf = CF(molecule,positions,dataset.atoms[molecule],
+        #            model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz")
         fractions_energies_rank[i,1]=cf.calc_Etot_cf()
         print(fractions_energies_rank[i,1])
     comm.barrier()

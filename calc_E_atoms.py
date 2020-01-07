@@ -4,7 +4,7 @@ import sys
 from CFXpo import CF
 
 #Dictionary with the atoms and it's total spin
-atoms={"H":1,"He":0,"Li":1,
+atoms={#"H":1,"He":0,"Li":1,
         "Be":0,"B":1,
          "C":2,"N":3,
         "O":2,"F":1,"Ne":0,"Na":1,"Ne":0,"Na":1,

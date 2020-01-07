@@ -12,7 +12,11 @@ from BRx import *
 class CF(ModelXC):
     def __init__(self,molecule,positions,spin,method,approx='pbe,pbe',
                     basis='6-311+g2dp.nw',num_threads=1,ASE=True):
+        lib.num_threads(num_threads)
+
+
         super().__init__(molecule,positions,spin,approx,basis,num_threads,ASE)
+
         # to obtain exks energy densities
         self.calc_eps_xks_post_approx() 
         self.method=method
