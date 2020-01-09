@@ -10,6 +10,8 @@ class ModelXC():
 
         self.aovalues = kskernel.GetAOValues()
         self.dm = kskernel.GetDM()
+        self.dm_up = self.dm[0]
+        self.dm_down = self.dm[1]
         self.coords = kskernel.GetCoords()
         self.weights = kskernel.GetWeights()
         self.ngridpoints = self.weights.shape[0]
@@ -19,7 +21,7 @@ class ModelXC():
         self.exchange_functional, self.correlation_functional = functional.split(",")
 
     @property
-    def CalculateEpsilonC(self, functional, params_up, params_down):
+    def CalculateEpsilonC(self, params_up, params_down):
         return NotImplementedError('Subclass specialization')
 
     @property
@@ -41,15 +43,15 @@ class ModelXC():
         return NotImplementedError('Subclass specialization')
 
     @property
-    def CalculateTotalX(self, functional, params_up, params_down):
+    def CalculateTotalX(self, params_up, params_down):
         return NotImplementedError('Subclass specialization')
 
     @property
-    def CalculateTotalC(self, functional, params_up, params_down):
+    def CalculateTotalC(self, params_up, params_down):
         return NotImplementedError('Subclass specialization')        
 
     @property
-    def CalculateTotalXC(self, functional, params_up, params_down):
+    def CalculateTotalXC(self, params_up, params_down):
         """
         To calculate the total exchange-correlation energy for a functional
         in a post-approx manner
@@ -60,7 +62,7 @@ class ModelXC():
         return NotImplementedError('Subclass specialization')
 
     @property
-    def CalculateTotalEnergy(self, functional, params_up, params_down):
+    def CalculateTotalEnergy(self, params_up, params_down):
         """
         To calculate the total energies of a functional
         with post-approx densities

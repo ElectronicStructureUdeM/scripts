@@ -9,7 +9,7 @@ class DFA(ModelXC):
     def __init__(self, mol, KSKernel, functional):
         super().__init__(mol, KSKernel, functional)
 
-    def CalculateEpsilonC(self, params_up, params_down):
+    def CalculateEpsilonC(self, params_up = None, params_down = None):
 
         if params_up is None and params_down is None:
             params_up, params_down = self.kskernel.GetParams()
@@ -20,22 +20,28 @@ class DFA(ModelXC):
         eps_c, vc = dft.libxc.eval_xc("," + self.correlation_functional, [params_up, params_down], spin=5)[:2]
         return eps_c, vc
 
-    def CalculateEpsilonX(self, params_up, params_down):
+    def CalculateEpsilonX(self, params_up = None, params_down = None):
 
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down
 
-        eps_x_up = 0.0
-        eps_x_down = 0.0
-        vx_up = 0.0
-        vx_down = 0.0
+        eps_x_up = np.zeros(self.ngridpoints)
+        eps_x_down = np.zeros(self.ngridpoints)
+        vx_up = np.zeros(self.ngridpoints)
+        vx_down = np.zeros(self.ngridpoints)
         zeros = np.zeros(self.ngridpoints)
-        eps_x_up, vx_up = dft.libxc.eval_xc(self.exchange_functional + ",", [params_up, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
 
-        eps_x_down, vx_down = dft.libxc.eval_xc(self.exchange_functional + ",", [params_down, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
+        eps_x_up, vx_up = dft.libxc.eval_xc(self.exchange_functional + ",", [params_up, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
+        if self.mol.spin == 0: 
+            eps_x_down = eps_x_up
+            vx_down = vx_up
+        elif self.mol.nelectron > 1:
+            eps_x_down, vx_down = dft.libxc.eval_xc(self.exchange_functional + ",", [params_down, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
+        
         return eps_x_up, vx_up, eps_x_down, vx_down
 
-    def CalculateEpsilonXC(self, params_up, params_down):
+    def CalculateEpsilonXC(self, params_up = None, params_down = None):
         """
         This function calculates the exchange-correlation energy densities
         from a functional with converged self-consistant  densities
@@ -46,22 +52,26 @@ class DFA(ModelXC):
         TODO:
             For spin unpolarized, the calculation are done uselessly for down spin
         """
+        print(params_up, params_down)
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down
+        print(params_up, params_down)
 
         #here spin is defined as greater than one so we can exact up and down energies densites
         zeros = np.zeros(self.ngridpoints) # also used so we can exact up and down energies densites
-
+        
         eps_x_up, vx_up, eps_x_down, vx_down = self.CalculateEpsilonX(self.exchange_functional, params_up)
         
         eps_c,vc = dft.libxc.eval_xc("," + self.correlation_functional, [params_up, params_down], spin = 5)[:2]
 
         return eps_x_up, vx_up, eps_x_down, vx_down, eps_c, vc
 
-    def CalculateTotalX(self, params_up, params_down):
+    def CalculateTotalX(self, params_up = None, params_down = None):
 
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down            
 
         Ex_up = 0.0
         Ex_down = 0.0
@@ -77,10 +87,11 @@ class DFA(ModelXC):
 
         return Ex_up + Ex_down
 
-    def CalculateTotalC(self, params_up, params_down):
+    def CalculateTotalC(self, params_up = None, params_down = None):
 
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down
 
         rho_up = params_up[0]
         rho_down = params_down[0]
@@ -89,7 +100,7 @@ class DFA(ModelXC):
         eps_c,vc = self.CalculateEpsilonC(params_up, params_down)
         return np.einsum("i,i,i->", eps_c, rho, self.weights)
 
-    def CalculateTotalXC(self, params_up, params_down):
+    def CalculateTotalXC(self, params_up = None, params_down = None):
         """
         To calculate the total exchange-correlation energy for a functional
         in a post-approx manner
@@ -99,7 +110,8 @@ class DFA(ModelXC):
         """
 
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down            
 
         Ex = 0.0
         Ec = 0.0
@@ -109,7 +121,7 @@ class DFA(ModelXC):
 
         return (Ex + Ec)
 
-    def CalculateTotalEnergy(self, params_up, params_down):
+    def CalculateTotalEnergy(self, params_up = None, params_down = None):
         """
         To calculate the total energies of a functional
         with post-approx densities

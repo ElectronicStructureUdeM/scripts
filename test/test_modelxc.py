@@ -1,12 +1,15 @@
-import numpy as np
 import sys
 # add code's directory
 sys.path.insert(1, '../')
 
+import numpy as np
+from pyscf import gto
+
 import kernel
 from modelxc import ModelXC
-from exks import ExKS
+from ksex import ExKS
 from dfa import DFA
+from ac import AC
 
 def main():
 
@@ -53,7 +56,7 @@ def main():
 
         kskernel.CalculateKSKernel(mol)
 
-        ex = ExKS(mol, kskernel, 'exks')
+        ex = ExKS(mol, kskernel, 'exks,')
         exks = ex.CalculateEpsilonX()
 
         lsd = DFA(mol, kskernel, 'LDA,PW_MOD')
@@ -62,8 +65,8 @@ def main():
         pbe = DFA(mol, kskernel, 'PBE,PBE')
         pbe_xc = pbe.CalculateEpsilonXC()
 
-        cfx = CF('cfx', mol, kernel)
-        cfx_xc = cfx.CalculateEpsilonXC()
+        # cfx = CF('cfx', mol, kernel)
+        # cfx_xc = cfx.CalculateEpsilonXC()
 
     return
 

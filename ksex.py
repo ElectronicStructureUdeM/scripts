@@ -30,45 +30,52 @@ class ExKS(ModelXC):
             ex:float
                 ex^ks
         """
-        with mol.with_rinv_origin((coord[0], coord[1], coord[2])):
-            A = mol.intor('int1e_rinv')
+        with self.mol.with_rinv_origin((coord[0], coord[1], coord[2])):
+            A = self.mol.intor('int1e_rinv')
         F = np.dot(dm, ao_value)
         return -np.einsum('i,j,ij',F,F,A)/2.
         
-    def CalculateEpsilonX(self, functional, params_up, params_down):
+    def CalculateEpsilonX(self, params_up=None, params_down=None):
         """
         To calculate the exact exchange energy density on the grid
         """
+        if params_up is None and params_down is None:
+            params_up, params_down = self.kskernel.GetParams()
+
         rho_up = params_up[0]
         rho_down = params_down[0]
+        eps_x_exact_up = np.zeros(self.ngridpoints)
+        eps_x_exact_down = np.zeros(self.ngridpoints)
         ex_exact_up = np.zeros(self.ngridpoints)
         ex_exact_down = np.zeros(self.ngridpoints)
 
-        if self.mol.spin == 0:
-            #EX exact
-            for gridID in range(self.ngridpoints):
-                ex_exact_up[gridID] = self.compute_ex_exact(self.ao_values[0,gridID,:], self.dm_up,self.coords[gridID])
-                
-            ex_exact_down = self.ex_exact_up
-        else:# for spin polarized molecule
-            for gridID in range(self.ngridpoints):
-                ex_exact_up[gridID] = self.compute_ex_exact(self.ao_values[0,gridID,:], self.dm_up,self.coords[gridID])
-                ex_exact_down[gridID] = self.compute_ex_exact(self.ao_values[0,gridID,:], self.dm_down,self.coords[gridID])
-
+        for gridID in range(self.ngridpoints):
+            ex_exact_up[gridID] = self.compute_ex_exact(self.aovalues[0,gridID,:], self.dm_up,self.coords[gridID])
         eps_x_exact_up = ex_exact_up / rho_up
-        eps_x_exact_down = ex_exact_down / rho_down
+
+        if self.mol.spin == 0: 
+            ex_exact_down = ex_exact_up
+        elif self.mol.nelectron > 1:
+            for gridID in range(self.ngridpoints):
+                ex_exact_down[gridID] = self.compute_ex_exact(self.aovalues[0,gridID,:], self.dm_down, self.coords[gridID])
+            eps_x_exact_down = ex_exact_down / rho_down
 
         return eps_x_exact_up, eps_x_exact_down
         
-    def CalculateTotalX(self):
+    def CalculateTotalX(self, params_up=None, params_down=None):
         """
-        Function to compute the total exchange energy of a molecule with 
+            Function to compute the total exchange energy of a molecule with 
         exact exchange exchange KS.
         The energies are are calculated post-approx (not self-consitent).
         """
+        if params_up is None and params_down is None:
+            params_up, params_down = self.kskernel.GetParams()
+
         eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(functional, params_up, params_down)
         return np.einsum('i,i->', ex_exact_up + ex_exact_down, weights)
 
-    def CalculateTotalXC(self):
+    def CalculateTotalXC(self, params_up = None, params_down = None):
+        if params_up is None and params_down is None:
+            params_up, params_down = self.kskernel.GetParams()        
         eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(functional, params_up, params_down)
         return np.einsum('i,i->', ex_exact_up + ex_exact_down, weights)
