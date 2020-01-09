@@ -1,13 +1,12 @@
-
-from pyscf import gto # to be deleted
 import numpy as np
+from pyscf import gto # to be deleted
 
 import kernel
 from modelxc import ModelXC
 
 class ExKS(ModelXC):
 
-    def __init__(self, mol, KSKernel, functional):
+    def __init__(self, mol, KSKernel, functional='exks,'):
         super().__init__(mol, KSKernel, functional)
         
         self.ex_exact_up    = 0.0
@@ -70,73 +69,6 @@ class ExKS(ModelXC):
         eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(functional, params_up, params_down)
         return np.einsum('i,i->', ex_exact_up + ex_exact_down, weights)
 
-def main():
-
-    functionals = ['LDA,PW_MOD', 'PBE,PBE']
-    
-    systems = {
-            "H" : { 
-                'name'         : 'Hydrogen',
-                'symbol'       : 'H',
-                'spin'         : 1,
-                'positions'    : [[ 0., 0., 0.]]},
-            "Li" : {
-                'name'         : 'Lithium',
-                'symbol'       : 'Li',
-                'spin'         : 1,
-                'positions'    : [[ 0., 0., 0.]]},
-            "O" : {
-                'name'         : 'Oxygen',
-                'symbol'       : 'O',
-                'spin'         : 2,
-                'positions'    : [[ 0., 0., 0.]]},
-            "Ar" : {
-                'name'         : 'Argon',
-                'symbol'       : 'Ar',
-                'spin'         : 0,
-                'positions'    : [[ 0., 0., 0.]]}
-    }
-
-    kskernel = kernel.KSKernel()
-
-    for key in systems:
-
-        system = systems[key]
-
-        print(system['name'] + ' 0.0 0.0 0.0')
-        coords = system['symbol'] + ' 0.0 0.0 0.0'
-
-        mol = gto.Mole()
-        mol.atom = coords
-        mol.basis = 'cc-pvtz'
-        mol.spin = system['spin']
-        mol.charge = 0
-        mol.build()
-
-        kskernel.CalculateKSKernel(mol)
-
-        ex = ExKS(mol, kskernel)
-        exks = ex.CalculateEpsilonX()
-
-        lsd = DFA('LDA,PW_MOD', mol, kskernel)
-        lsd_xc = lsd.CalculateEpsilonXC()
-
-        pbe = DFA('PBE,PBE', mol, kskernel)
-        pbe_xc = pbe.CalculateEpsilonXC()
-
-        cfx = CF('cfx', mol, kernel)
-        cfx_xc = cfx.CalculateEpsilonXC()
-        
-        lsdpade3p = AC(mol, kskernel, lsd, 'pade3p')
-        lsdpade3p_xc = lsdpade3p.CalculateEpsilonXC()
-
-        pbepade3p = AC(mol, kskernel, pbe, 'pade3p')
-        pbepade3p_xc = pbepade3p.CalculateEpsilonXC()
-
-        cfxpade3p = AC(mol, kskernel, cfx, 'pade3p')
-        cfxpade3p_xc = cfxpade3p.CalculateEpsilonXC()
-
-    return
-
-if __name__ == "__main__":
-    main()
+    def CalculateTotalXC(self):
+        eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(functional, params_up, params_down)
+        return np.einsum('i,i->', ex_exact_up + ex_exact_down, weights)

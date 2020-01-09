@@ -3,9 +3,10 @@ from pyscf import dft,lib,scf
 import kernel
 
 class ModelXC():
-    def __init__(self, mol, KSKernel, functional):
+    def __init__(self, mol, kskernel, functional):
 
         self.mol = mol
+        self.kskernel = kskernel
 
         self.aovalues = kskernel.GetAOValues()
         self.dm = kskernel.GetDM()
@@ -15,13 +16,14 @@ class ModelXC():
         self.params_up, self.params_down = kskernel.GetParams()
 
         self.functional = functional
+        self.exchange_functional, self.correlation_functional = functional.split(",")
 
     @property
     def CalculateEpsilonC(self, functional, params_up, params_down):
         return NotImplementedError('Subclass specialization')
 
     @property
-    def CalculateEpsilonX(self, params):
+    def CalculateEpsilonX(self, params_up, params_down):
         return NotImplementedError('Subclass specialization')
 
     @property
