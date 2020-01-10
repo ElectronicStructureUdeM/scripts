@@ -55,15 +55,28 @@ def main():
         mol.build()
 
         kskernel.CalculateKSKernel(mol)
+        print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(kskernel.mf.e_tot, 0.0, 0.0, kskernel.mf.get_veff().exc))
 
         ex = ExKS(mol, kskernel, 'exks,')
-        exks = ex.CalculateEpsilonX()
+        x = ex.CalculateTotalX()
+        c = ex.CalculateTotalC()
+        xc = ex.CalculateTotalXC()
+        e = ex.CalculateTotalEnergy()
+        print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(e, x, c, xc))
 
         lsd = DFA(mol, kskernel, 'LDA,PW_MOD')
-        lsd_xc = lsd.CalculateEpsilonXC()
-
+        x = lsd.CalculateTotalX()
+        c = lsd.CalculateTotalC()
+        xc = lsd.CalculateTotalXC()
+        e = lsd.CalculateTotalEnergy()
+        print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(e, x, c, xc))
+        
         pbe = DFA(mol, kskernel, 'PBE,PBE')
-        pbe_xc = pbe.CalculateEpsilonXC()
+        x = pbe.CalculateTotalX()
+        c = pbe.CalculateTotalC()
+        xc = pbe.CalculateTotalXC()
+        e = pbe.CalculateTotalEnergy()
+        print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(e, x, c, xc))
 
         # cfx = CF('cfx', mol, kernel)
         # cfx_xc = cfx.CalculateEpsilonXC()

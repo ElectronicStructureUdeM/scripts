@@ -12,12 +12,14 @@ class DFA(ModelXC):
     def CalculateEpsilonC(self, params_up = None, params_down = None):
 
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down
 
         eps_c = 0.0
         vc = 0.0
 
         eps_c, vc = dft.libxc.eval_xc("," + self.correlation_functional, [params_up, params_down], spin=5)[:2]
+
         return eps_c, vc
 
     def CalculateEpsilonX(self, params_up = None, params_down = None):
@@ -52,18 +54,16 @@ class DFA(ModelXC):
         TODO:
             For spin unpolarized, the calculation are done uselessly for down spin
         """
-        print(params_up, params_down)
         if params_up is None and params_down is None:
             params_up = self.params_up
             params_down = self.params_down
-        print(params_up, params_down)
 
         #here spin is defined as greater than one so we can exact up and down energies densites
         zeros = np.zeros(self.ngridpoints) # also used so we can exact up and down energies densites
         
-        eps_x_up, vx_up, eps_x_down, vx_down = self.CalculateEpsilonX(self.exchange_functional, params_up)
-        
-        eps_c,vc = dft.libxc.eval_xc("," + self.correlation_functional, [params_up, params_down], spin = 5)[:2]
+        eps_x_up, vx_up, eps_x_down, vx_down = self.CalculateEpsilonX(params_up, params_down)
+
+        eps_c,vc = self.CalculateEpsilonC(params_up, params_down)
 
         return eps_x_up, vx_up, eps_x_down, vx_down, eps_c, vc
 
@@ -98,6 +98,7 @@ class DFA(ModelXC):
         rho = rho_up + rho_down
 
         eps_c,vc = self.CalculateEpsilonC(params_up, params_down)
+
         return np.einsum("i,i,i->", eps_c, rho, self.weights)
 
     def CalculateTotalXC(self, params_up = None, params_down = None):
@@ -132,7 +133,9 @@ class DFA(ModelXC):
         """
 
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down
 
-        Exc = self.CalculateTotalXC(params_up, params_down)
-        return self.mf.e_tot + Exc
+        xc = self.CalculateTotalXC(params_up, params_down)
+
+        return self.kskernel.mf.e_tot + xc - self.kskernel.approx_xc

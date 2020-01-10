@@ -74,10 +74,10 @@ class KSKernel:
         self.mf = scf.UKS(mol)
         self.mf.small_rho_cutoff = 1e-12
         self.mf.grids.radi_method = dft.radi.delley
-        self.mf.xc = ''
-        self.mf.verbose = 0
+        self.mf.xc = 'LDA,PW_MOD'
+        # self.mf.verbose = 0
         self.mf.kernel()
-        self.approx_Exc = self.mf.get_veff().exc
+        self.approx_xc = self.mf.get_veff().exc
 
         #for stuff related to grid
         self.coords = self.mf.grids.coords
@@ -153,6 +153,6 @@ class KSKernel:
 
     def GetParamUP(self):
         return [self.rho_up, self.dx_rho_up, self.dy_rho_up, self.dz_rho_up, self.laprho_up, self.tau_up]
-        
+
     def GetParamDown(self):
         return [self.rho_down, self.dx_rho_down, self.dy_rho_down, self.dz_rho_down, self.laprho_down, self.tau_down]

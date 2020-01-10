@@ -33,14 +33,17 @@ class ExKS(ModelXC):
         with self.mol.with_rinv_origin((coord[0], coord[1], coord[2])):
             A = self.mol.intor('int1e_rinv')
         F = np.dot(dm, ao_value)
+
         return -np.einsum('i,j,ij',F,F,A)/2.
         
     def CalculateEpsilonX(self, params_up=None, params_down=None):
         """
         To calculate the exact exchange energy density on the grid
         """
+
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
+            params_up = self.params_up
+            params_down = self.params_down
 
         rho_up = params_up[0]
         rho_down = params_down[0]
@@ -68,14 +71,44 @@ class ExKS(ModelXC):
         exact exchange exchange KS.
         The energies are are calculated post-approx (not self-consitent).
         """
-        if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()
 
-        eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(functional, params_up, params_down)
-        return np.einsum('i,i->', ex_exact_up + ex_exact_down, weights)
+        if params_up is None and params_down is None:
+            params_up = self.params_up
+            params_down = self.params_down            
+
+        rho_up = params_up[0]
+        rho_down = params_down[0]
+        rho = rho_up + rho_down
+
+        eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(params_up, params_down)
+
+        return np.einsum('i,i,i->', eps_x_exact_up + eps_x_exact_down, rho, self.kskernel.weights)
+
+    def CalculateTotalC(self, params_up = None, params_down = None):
+        return 0.0
 
     def CalculateTotalXC(self, params_up = None, params_down = None):
+
         if params_up is None and params_down is None:
-            params_up, params_down = self.kskernel.GetParams()        
-        eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(functional, params_up, params_down)
-        return np.einsum('i,i->', ex_exact_up + ex_exact_down, weights)
+            params_up = self.params_up
+            params_down = self.params_down            
+
+        return self.CalculateTotalX(params_up, params_down)
+    
+    def CalculateTotalEnergy(self, params_up = None, params_down = None):
+        """
+        To calculate the total energies of a functional
+        with post-approx densities
+
+        Input:
+            functional:string
+                functional name in pyscf format
+        """
+
+        if params_up is None and params_down is None:
+            params_up = self.params_up
+            params_down = self.params_down
+
+        Exc = self.CalculateTotalXC(params_up, params_down)
+
+        return self.kskernel.mf.e_tot + Exc
