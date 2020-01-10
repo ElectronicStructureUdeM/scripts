@@ -58,15 +58,12 @@ class AC:
         params_up = scaled_rho_up, scaled_dx_rho_up, scaled_dy_rho_up, scaled_dz_rho_up, scaled_laprho_up, scaled_tau_up
         params_down = scaled_rho_down, scaled_dx_rho_down, scaled_dy_rho_down, scaled_dz_rho_down, scaled_laprho_down, scaled_tau_down
 
-        x_up = self.df.CalculateEpsilonX(params_up)[0]
-
-        x_down = np.zeros(x_up.shape[0])
-        if np.all(rho_down) > 0.0:
-            x_down = self.df.CalculateEpsilonX(params_down)[0]
+        # x_up = self.df.CalculateEpsilonX(params_up, params_down)[0]
+        eps_x_up, eps_x_down = self.df.CalculateEpsilonX(params_up, params_down)
             
-        c = self.df.CalculateEpsilonC(params_up, params_down)[0]
+        eps_c = self.df.CalculateEpsilonC(params_up, params_down)
         
-        xc = (x_up * rho_up + x_down * rho_down) / (rho_up + rho_down) + c
+        xc = (eps_x_up * rho_up + eps_x_down * rho_down) / (rho_up + rho_down) + eps_c
 
         return xc
 

@@ -20,7 +20,7 @@ class DFA(ModelXC):
 
         eps_c, vc = dft.libxc.eval_xc("," + self.correlation_functional, [params_up, params_down], spin=5)[:2]
 
-        return eps_c, vc
+        return eps_c
 
     def CalculateEpsilonX(self, params_up = None, params_down = None):
 
@@ -41,7 +41,7 @@ class DFA(ModelXC):
         elif self.mol.nelectron > 1:
             eps_x_down, vx_down = dft.libxc.eval_xc(self.exchange_functional + ",", [params_down, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
         
-        return eps_x_up, vx_up, eps_x_down, vx_down
+        return eps_x_up, eps_x_down
 
     def CalculateEpsilonXC(self, params_up = None, params_down = None):
         """
@@ -65,7 +65,7 @@ class DFA(ModelXC):
 
         eps_c,vc = self.CalculateEpsilonC(params_up, params_down)
 
-        return eps_x_up, vx_up, eps_x_down, vx_down, eps_c, vc
+        return eps_x_up, eps_x_down, eps_c
 
     def CalculateTotalX(self, params_up = None, params_down = None):
 
@@ -79,7 +79,7 @@ class DFA(ModelXC):
         rho_up = params_up[0]
         rho_down = params_down[0]
 
-        eps_x_up, vx_up, eps_x_down, vx_down = self.CalculateEpsilonX(params_up, params_down)
+        eps_x_up, eps_x_down = self.CalculateEpsilonX(params_up, params_down)
         Ex_up = np.einsum("i,i,i->", eps_x_up, rho_up, self.weights)
 
         if np.all(rho_down) > 0.0:
@@ -97,7 +97,7 @@ class DFA(ModelXC):
         rho_down = params_down[0]
         rho = rho_up + rho_down
 
-        eps_c,vc = self.CalculateEpsilonC(params_up, params_down)
+        eps_c = self.CalculateEpsilonC(params_up, params_down)
 
         return np.einsum("i,i,i->", eps_c, rho, self.weights)
 

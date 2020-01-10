@@ -1,8 +1,15 @@
 import numpy as np
 from pyscf import gto # to be deleted
 
+from mpi4pyscf.lib import logger
+from mpi4pyscf.tools import mpi
+
+
 import kernel
 from modelxc import ModelXC
+
+comm = mpi.comm
+rank = mpi.rank
 
 class ExKS(ModelXC):
 
@@ -52,6 +59,9 @@ class ExKS(ModelXC):
         ex_exact_up = np.zeros(self.ngridpoints)
         ex_exact_down = np.zeros(self.ngridpoints)
 
+
+        #@profile
+        # @mpi.parallel_call(skip_args=[1])
         for gridID in range(self.ngridpoints):
             ex_exact_up[gridID] = self.compute_ex_exact(self.aovalues[0,gridID,:], self.dm_up,self.coords[gridID])
         eps_x_exact_up = ex_exact_up / rho_up
