@@ -1,15 +1,8 @@
 import numpy as np
 from pyscf import gto # to be deleted
 
-from mpi4pyscf.lib import logger
-from mpi4pyscf.tools import mpi
-
-
 import kernel
 from modelxc import ModelXC
-
-comm = mpi.comm
-rank = mpi.rank
 
 class ExKS(ModelXC):
 
@@ -59,11 +52,8 @@ class ExKS(ModelXC):
         ex_exact_up = np.zeros(self.ngridpoints)
         ex_exact_down = np.zeros(self.ngridpoints)
 
-
-        #@profile
-        # @mpi.parallel_call(skip_args=[1])
         for gridID in range(self.ngridpoints):
-            ex_exact_up[gridID] = self.compute_ex_exact(self.aovalues[0,gridID,:], self.dm_up,self.coords[gridID])
+            ex_exact_up[gridID] = self.compute_ex_exact(self.aovalues[0,gridID,:], self.dm_up, self.coords[gridID])
         eps_x_exact_up = ex_exact_up / rho_up
 
         if self.mol.spin == 0: 
@@ -92,7 +82,10 @@ class ExKS(ModelXC):
 
         eps_x_exact_up, eps_x_exact_down = self.CalculateEpsilonX(params_up, params_down)
 
-        return np.einsum('i,i,i->', eps_x_exact_up + eps_x_exact_down, rho, self.kskernel.weights)
+        ex_exact_up = rho_up * eps_x_exact_up
+        ex_exact_down = rho_down * eps_x_exact_down
+
+        return np.einsum('i,i->', ex_exact_up + ex_exact_down, self.kskernel.weights)
 
     def CalculateTotalC(self, params_up = None, params_down = None):
         return 0.0
@@ -119,6 +112,6 @@ class ExKS(ModelXC):
             params_up = self.params_up
             params_down = self.params_down
 
-        Exc = self.CalculateTotalXC(params_up, params_down)
+        xc = self.CalculateTotalXC(params_up, params_down)
 
-        return self.kskernel.mf.e_tot + Exc
+        return self.kskernel.mf.e_tot - self.kskernel.approx_xc + xc

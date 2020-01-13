@@ -138,4 +138,4 @@ class DFA(ModelXC):
 
         xc = self.CalculateTotalXC(params_up, params_down)
 
-        return self.kskernel.mf.e_tot + xc - self.kskernel.approx_xc
+        return self.kskernel.mf.e_tot - self.kskernel.approx_xc + xc

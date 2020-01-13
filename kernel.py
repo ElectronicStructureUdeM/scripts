@@ -71,7 +71,7 @@ class KSKernel:
 
     def CalculateKSKernel(self, mol):
 
-        self.mf = scf.UKS(mol)
+        self.mf = scf.KS(mol)
         self.mf.small_rho_cutoff = 1e-12
         self.mf.grids.radi_method = dft.radi.delley
         self.mf.xc = 'LDA,PW_MOD'
