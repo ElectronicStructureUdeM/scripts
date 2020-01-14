@@ -72,6 +72,7 @@ class ModelXC:
         else:
             dm = self.mf.make_rdm1()
             self.dm_up = dm[0]
+            print(self.dm_up)
             self.dm_down=dm[1]
             self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
@@ -134,7 +135,7 @@ class ModelXC:
         To calculate the exact exchange energy density on the grid
         """
         self.ex_exact_up=np.zeros(self.n_grid)
-        self.ex_exact_down=np.zeros(self.n_grid)
+        self.ex_exact_down=np.zeros(self.n_grid)   
         if self.mol.spin==0:
             #EX exact
             for gridID in range(self.n_grid):
@@ -170,6 +171,7 @@ class ModelXC:
             return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
         except AttributeError:#if it was never calculated before
             self.calc_Exks_post_approx()
+            print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot, self.approx_Exc, 0.0, 0.0))
             return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
             
     def calc_eps_xc_post_approx(self,functional):

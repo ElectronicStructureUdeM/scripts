@@ -49,7 +49,7 @@ def main():
 
         mol = gto.Mole()
         mol.atom = coords
-        mol.basis = 'cc-pvtz'
+        mol.basis = '../basis/6-311+g2dp.nw'
         mol.cart = True
         mol.spin = system['spin']
         mol.charge = 0
@@ -57,6 +57,13 @@ def main():
 
         kskernel.CalculateKSKernel(mol)
         print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(kskernel.mf.e_tot, 0.0, 0.0, kskernel.mf.get_veff().exc))
+
+        exks = ExKS(mol, kskernel, 'exks,')
+        x = exks.CalculateTotalX()
+        c = exks.CalculateTotalC()
+        xc = exks.CalculateTotalXC()
+        e = exks.CalculateTotalEnergy()
+        print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(e, x, c, xc))
 
         lsd = DFA(mol, kskernel, 'LDA,PW_MOD')
         x = lsd.CalculateTotalX()
@@ -70,13 +77,6 @@ def main():
         c = pbe.CalculateTotalC()
         xc = pbe.CalculateTotalXC()
         e = pbe.CalculateTotalEnergy()
-        print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(e, x, c, xc))
-
-        ex = ExKS(mol, kskernel, 'exks,')
-        x = ex.CalculateTotalX()
-        c = ex.CalculateTotalC()
-        xc = ex.CalculateTotalXC()
-        e = ex.CalculateTotalEnergy()
         print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(e, x, c, xc))
 
         # cfx = CF('cfx', mol, kernel)

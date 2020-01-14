@@ -47,20 +47,20 @@ class ExKS(ModelXC):
 
         rho_up = params_up[0]
         rho_down = params_down[0]
-        eps_x_exact_up = np.zeros(self.ngridpoints)
-        eps_x_exact_down = np.zeros(self.ngridpoints)
-        ex_exact_up = np.zeros(self.ngridpoints)
-        ex_exact_down = np.zeros(self.ngridpoints)
-
-        for gridID in range(self.ngridpoints):
-            ex_exact_up[gridID] = self.compute_ex_exact(self.aovalues[0,gridID,:], self.dm_up, self.coords[gridID])
+        eps_x_exact_up = np.zeros(self.kskernel.ngrid)
+        eps_x_exact_down = np.zeros(self.kskernel.ngrid)
+        ex_exact_up = np.zeros(self.kskernel.ngrid)
+        ex_exact_down = np.zeros(self.kskernel.ngrid)
+        print(self.kskernel.aovalues)
+        for gridID in range(self.kskernel.ngrid):
+            ex_exact_up[gridID] = self.compute_ex_exact(self.kskernel.aovalues[0, gridID,:], self.kskernel.dm_up, self.kskernel.coords[gridID])
         eps_x_exact_up = ex_exact_up / rho_up
 
         if self.mol.spin == 0: 
             ex_exact_down = ex_exact_up
         elif self.mol.nelectron > 1:
-            for gridID in range(self.ngridpoints):
-                ex_exact_down[gridID] = self.compute_ex_exact(self.aovalues[0,gridID,:], self.dm_down, self.coords[gridID])
+            for gridID in range(self.kskernel.ngrid):
+                ex_exact_down[gridID] = self.compute_ex_exact(self.kskernel.aovalues[0, gridID,:], self.kskernel.dm_down, self.kskernel.coords[gridID])
             eps_x_exact_down = ex_exact_down / rho_down
 
         return eps_x_exact_up, eps_x_exact_down

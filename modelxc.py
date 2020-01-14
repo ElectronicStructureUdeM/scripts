@@ -9,9 +9,6 @@ class ModelXC():
         self.kskernel = kskernel
 
         self.aovalues = kskernel.GetAOValues()
-        self.dm = kskernel.GetDM()
-        self.dm_up = self.dm[0]
-        self.dm_down = self.dm[1]
         self.coords = kskernel.GetCoords()
         self.weights = kskernel.GetWeights()
         self.ngridpoints = self.weights.shape[0]

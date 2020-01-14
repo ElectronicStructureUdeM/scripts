@@ -74,7 +74,7 @@ class KSKernel:
         self.mf = scf.KS(mol)
         self.mf.small_rho_cutoff = 1e-12
         self.mf.grids.radi_method = dft.radi.delley
-        self.mf.xc = 'LDA,PW_MOD'
+        self.mf.xc = 'pbe,pbe'
         # self.mf.verbose = 0
         self.mf.kernel()
         self.approx_xc = self.mf.get_veff().exc
@@ -84,8 +84,11 @@ class KSKernel:
         self.weights = self.mf.grids.weights
         self.ngrid = np.shape(self.coords)[0]
         self.aovalues = dft.numint.eval_ao(mol, self.coords, deriv=2) #deriv=2, since we get every info(tau,lap,etc)
+        self.dm_up = np.zeros(self.ngrid)
+        self.dm_down = np.zeros(self.ngrid)
         self.dm = self.mf.make_rdm1()
         self.dm_up = self.dm[0]
+        print(self.dm_up)
 
         if mol.spin == 0:
             self.dm_down = self.dm_up
