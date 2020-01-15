@@ -35,7 +35,7 @@ class ExKS(ModelXC):
         F = np.dot(dm, ao_value)
 
         return -np.einsum('i,j,ij',F,F,A)/2.
-        
+
     def CalculateEpsilonX(self, params_up=None, params_down=None):
         """
         To calculate the exact exchange energy density on the grid
@@ -51,11 +51,11 @@ class ExKS(ModelXC):
         eps_x_exact_down = np.zeros(self.kskernel.ngrid)
         ex_exact_up = np.zeros(self.kskernel.ngrid)
         ex_exact_down = np.zeros(self.kskernel.ngrid)
-        print(self.kskernel.aovalues)
+        
         for gridID in range(self.kskernel.ngrid):
             ex_exact_up[gridID] = self.compute_ex_exact(self.kskernel.aovalues[0, gridID,:], self.kskernel.dm_up, self.kskernel.coords[gridID])
         eps_x_exact_up = ex_exact_up / rho_up
-
+        
         if self.mol.spin == 0: 
             ex_exact_down = ex_exact_up
         elif self.mol.nelectron > 1:

@@ -72,7 +72,6 @@ class ModelXC:
         else:
             dm = self.mf.make_rdm1()
             self.dm_up = dm[0]
-            print(self.dm_up)
             self.dm_down=dm[1]
             self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
@@ -135,7 +134,8 @@ class ModelXC:
         To calculate the exact exchange energy density on the grid
         """
         self.ex_exact_up=np.zeros(self.n_grid)
-        self.ex_exact_down=np.zeros(self.n_grid)   
+        self.ex_exact_down=np.zeros(self.n_grid)
+        
         if self.mol.spin==0:
             #EX exact
             for gridID in range(self.n_grid):
@@ -150,6 +150,7 @@ class ModelXC:
                                                 self.dm_down,self.coords[gridID])
         self.eps_x_exact_up = self.ex_exact_up/self.rho_up
         self.eps_x_exact_down = self.ex_exact_down/self.rho_down
+        
     def calc_Exks_post_approx(self):
         """
         Function to compute the total exchange energy of a molecule with 

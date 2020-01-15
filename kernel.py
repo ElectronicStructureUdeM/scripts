@@ -88,9 +88,9 @@ class KSKernel:
         self.dm_down = np.zeros(self.ngrid)
         self.dm = self.mf.make_rdm1()
         self.dm_up = self.dm[0]
-        print(self.dm_up)
 
         if mol.spin == 0:
+            self.dm_up = self.mf.make_rdm1(mo_occ=self.mf.mo_occ/2)
             self.dm_down = self.dm_up
             self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.laprho_up,self.tau_up = \
                                     dft.numint.eval_rho(mol, self.aovalues, self.dm_up, xctype="MGGA")

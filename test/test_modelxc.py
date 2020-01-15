@@ -82,7 +82,5 @@ def main():
         # cfx = CF('cfx', mol, kernel)
         # cfx_xc = cfx.CalculateEpsilonXC()
 
-    return
-
 if __name__ == "__main__":
     main()
