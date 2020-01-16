@@ -54,13 +54,19 @@ def main():
 
         kskernel.CalculateKSKernel(mol)
 
+        print('PBE:')
         pbe = DFA(mol, kskernel, 'PBE,PBE')
+        xc = pbe.CalculateTotalXC()
         pbepade3p = AC(pbe, 'pade3p')
-        pbepade3p_xc = pbepade3p.CalculateTotalXC()
+        ac_xc = pbepade3p.CalculateTotalXC()
+        print('AC XC = {:.12e} AVG XC = {:.12e}, Error = {:.12e}'.format(ac_xc, xc, (xc - ac_xc)))
 
+        print('Exact KS:')
         exks = ExKS(mol, kskernel, 'exks,')
+        xc = exks.CalculateTotalXC()
         exks_ac = AC(exks, 'pade3p')
-        exks_xc = exks_ac.CalculateTotalXC()
+        ac_xc = exks_ac.CalculateTotalXC()
+        print('AC XC = {:.12e} AVG XC = {:.12e}, Error = {:.12e}'.format(ac_xc, xc, (xc - ac_xc)))
 
         print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
 

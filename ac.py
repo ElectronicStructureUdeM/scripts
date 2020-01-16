@@ -110,11 +110,12 @@ class AC:
     def CalculateTotalXC(self):
         
         params_up, params_down = self.kskernel.GetParams()
-        TotalX = self.df.CalculateTotalX(params_up, params_down)
-        TotalC = self.df.CalculateTotalC(params_up, params_down)
-        TotalXC = self.df.CalculateTotalXC(params_up, params_down)
 
-        print('X = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(TotalX, TotalC, TotalXC))
+        # TotalX = self.df.CalculateTotalX(params_up, params_down)
+        # TotalC = self.df.CalculateTotalC(params_up, params_down)
+        # TotalXC = self.df.CalculateTotalXC(params_up, params_down)
+
+        # print('X = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(TotalX, TotalC, TotalXC))
 
         xcpplm_arr = self.XCPPLM(self.df.kskernel.weights.shape[0], self.npoints) # ToDo change access to ngridpoints
 
@@ -134,6 +135,5 @@ class AC:
         # print(times.sum()/10.0)
 
         xclm = np.sum(self.df.kskernel.weights * self.df.kskernel.rho * eps_xcavg)
-        print('AC XC = {:.12e} AVG XC = {:.12e}, Error = {:.12e}'.format(xclm, TotalXC, (TotalXC - xclm)))
 
         return xclm
