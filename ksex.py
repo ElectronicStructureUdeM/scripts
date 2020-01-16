@@ -87,6 +87,9 @@ class ExKS(ModelXC):
 
         return np.einsum('i,i->', ex_exact_up + ex_exact_down, self.kskernel.weights)
 
+    def CalculateEpsilonC(self, params_up = None, params_down = None):
+        return np.zeros(self.kskernel.ngrid)
+
     def CalculateTotalC(self, params_up = None, params_down = None):
         return 0.0
 

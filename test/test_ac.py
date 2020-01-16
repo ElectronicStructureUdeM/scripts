@@ -58,7 +58,7 @@ def main():
         pbepade3p = AC(pbe, 'pade3p')
         pbepade3p_xc = pbepade3p.CalculateTotalXC()
 
-        exks = ExKS(mol, kskernel)
+        exks = ExKS(mol, kskernel, 'exks,')
         exks_ac = AC(exks, 'pade3p')
         exks_xc = exks_ac.CalculateTotalXC()
 
