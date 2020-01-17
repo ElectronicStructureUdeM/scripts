@@ -33,28 +33,31 @@ class Fxc(ModelXC):
 
 
     @vectorize([float64(float64,float64,float64,float64)])
-    def calc_fx2(alpha,beta,u1,u2):
+    def calc_fx3(alpha,beta,gamma,u1):
         """
-        Calculate fx2
+        Calculate fx3: -(1+gamma*alpha*u)^2/(1+gamma*|alpha|*u)^2*exp(-beta*gamma*u)
         input:
 
             alpha:float
                 parameter
             beta:float
                 parameter
+            beta:gamma
+                parameter
             u1: array of float:
                 u values
 
 
         """
-        #return (-1.)*np.exp(-alpha*(beta*u1+u2)**2)
-        return -1./(1.+alpha*(u1+beta*u2)**2)
+        return -((1.+gamma*alpha*u1)**2/((1+np.abs(alpha)*gamma*u1)**2))*np.exp(-gamma*beta*u1)
 
-    def find_alpha(self,alpha,beta,epsilonX,rhoRU):
+    def find_gamma(self,gamma,alpha,beta,epsilonX,rhoRU):
         """
-        Target function to find alpha by reproducing epsilon_x 
-        and beta is a constant which will normalize the hole in the LSD limit
+        Target function to find gamma by reproducing epsilon_x 
+        and alpha beta are constants which will normalize the hole and reproduce eps_x lsd in the LSD limit
         Input:
+            gamma:float
+                paramter
             alpha:float
                 parameter
             beta: float
@@ -69,8 +72,8 @@ class Fxc(ModelXC):
                int_0^maxu 2*pi*u*rho(r,u)*fx2 du - epsilonX
 
         """
-        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
-        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx2*rhoRU)-epsilonX
+        fx3 = self.calc_fx3(alpha,beta,gamma,self.ux_pow[1])
+        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx3*rhoRU)-epsilonX
 
 
     def calc_fx(self,epsilonX,rhoR,rhoRU):
@@ -88,10 +91,12 @@ class Fxc(ModelXC):
                 the exchange factor for each u
         """
         kf = (3.*np.pi**2*rhoR)**(1./3.)
-        beta = 1.1540708018906927*kf
-        alpha= scipy.optimize.brentq(self.find_alpha,0,1000,args=(beta,epsilonX,rhoRU))
-        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
-        return fx2
+        alpha = -0.11335749522734706*kf
+        beta = 0.4644202728603701*kf
+        gamma= scipy.optimize.brentq(self.find_gamma,0,1000,args=(alpha,beta,epsilonX,rhoRU))
+        fx3 = self.calc_fx3(alpha,beta,gamma,self.ux_pow[1])
+        print(4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx3*rhoRU))
+        return fx3
 
     ####for correlation######################
     def calc_A(self,rs,zeta):
