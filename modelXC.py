@@ -107,6 +107,13 @@ class ModelXC:
         else:
             self.br_a_down,self.br_b_down,self.br_c_down,self.br_n_down = brhparam(self.Q_down,
                                                                         self.rho_down,self.eps_x_exact_down)
+            
+        self.GA = self.dx_rho_up**2+self.dy_rho_up**2+self.dz_rho_up**2
+        self.GB= self.dx_rho_down**2+self.dy_rho_down**2+self.dz_rho_down**2
+        self.GC = np.sqrt(self.GA*self.GB)
+        self.tauw = (self.GA+self.GB+2.*self.GC)/(8.*self.rho_tot)
+        self.taur = self.tau_up + self..tau_down
+        self.tauratio = self.tauw/self.taur
         
     def compute_ex_exact(self,ao_value,dm,coord):
         """
