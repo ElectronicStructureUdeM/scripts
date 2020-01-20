@@ -112,7 +112,7 @@ class ModelXC:
         self.GB= self.dx_rho_down**2+self.dy_rho_down**2+self.dz_rho_down**2
         self.GC = np.sqrt(self.GA*self.GB)
         self.tauw = (self.GA+self.GB+2.*self.GC)/(8.*self.rho_tot)
-        self.taur = self.tau_up + self..tau_down
+        self.taur = self.tau_up + self.tau_down
         self.tauratio = self.tauw/self.taur
         
     def compute_ex_exact(self,ao_value,dm,coord):
