@@ -4,7 +4,7 @@ import numpy as np
 from numba import vectorize,float64
 from BRx import brhparam
 class ModelXC:
-    def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1, ASE=True):
+    def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1, ASE=True,charge=0):
         """
         In the init, the pyscf Mole object and scf.ks object will be created
         Input:
@@ -33,6 +33,7 @@ class ModelXC:
             atom_pos = positions[nAtom]
             molecule.append([atom,(atom_pos[0],atom_pos[1],atom_pos[2])])
             nAtom=nAtom+1
+        self.mol.charge=charge
         self.mol.atom=molecule
         self.mol.verbose=0
         self.mol.spin=spin

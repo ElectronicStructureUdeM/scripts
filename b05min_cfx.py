@@ -21,17 +21,31 @@ fractions_energies_rank = recvbuf
 num_fractions = np.shape(fractions_energies_rank)[0]
 #positions= [[0,0,0]]
 model=sys.argv[1]
-
-for molecule in dataset.molecules:
+data=sys.argv[2]
+if data=="cations":
+    molecules=dataset.IP13_cations
+    charge=1
+elif data=="neutrals":
+    molecules=dataset.IP13_neutrals
+    charge=0
+elif data=="reactants":
+    molecules=dataset.BH6_reactants
+    charge=0
+elif data=="TS":
+    molecules=dataset.BH6_TS
+    charge=0
+for molecule in molecules:
 #for molecule in dataset.atoms:
     comm.barrier()
     for i in range(num_fractions):
         frac = fractions_energies_rank[i,0]
         print(str(frac)+"*HF+"+str(1.-frac)+"*pbe")
-        cf = CF(molecule,dataset.molecules[molecule][1],dataset.molecules[molecule][0],
-                    model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz",num_threads=1)
+        #cf = CF(molecule,dataset.molecules[molecule][1],dataset.molecules[molecule][0],
+        #            model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz",num_threads=1)
         #cf = CF(molecule,positions,dataset.atoms[molecule],
         #            model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz")
+        cf = CF(molecule,molecules[molecule][1],molecules[molecule][0],
+                    model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz",num_threads=1,charge=charge)
         fractions_energies_rank[i,1]=cf.calc_Etot_cf()
         print(fractions_energies_rank[i,1])
     comm.barrier()
@@ -39,5 +53,5 @@ for molecule in dataset.molecules:
         recvbuf = np.empty((total_fractions,2),dtype='d')
     comm.Gather(fractions_energies_rank,recvbuf,root=0)
     if rank==0:
-        np.savetxt(molecule+"_"+model+".txt",recvbuf)
+        np.savetxt(molecule+"_"+model+"_"+data+".txt",recvbuf)
     
