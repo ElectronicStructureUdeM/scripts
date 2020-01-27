@@ -22,7 +22,12 @@ num_fractions = np.shape(fractions_energies_rank)[0]
 #positions= [[0,0,0]]
 model=sys.argv[1]
 data=sys.argv[2]
-if data=="cations":
+if data=="atoms":
+    molecules=dataset.atoms
+elif data=="molecules":
+    molecules=dataset.molecules
+    charge=0
+elif data=="cations":
     molecules=dataset.IP13_cations
     charge=1
 elif data=="neutrals":
@@ -40,11 +45,11 @@ for molecule in molecules:
     for i in range(num_fractions):
         frac = fractions_energies_rank[i,0]
         print(str(frac)+"*HF+"+str(1.-frac)+"*pbe")
-        #cf = CF(molecule,dataset.molecules[molecule][1],dataset.molecules[molecule][0],
-        #            model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz",num_threads=1)
-        #cf = CF(molecule,positions,dataset.atoms[molecule],
-        #            model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz")
-        cf = CF(molecule,molecules[molecule][1],molecules[molecule][0],
+        if data=="atoms":
+            cf = CF(molecule,[[0,0,0]],dataset.atoms[molecule],
+                    model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz",num_threads=1)
+        else:
+            cf = CF(molecule,molecules[molecule][1],molecules[molecule][0],
                     model,approx=str(frac)+"*HF+"+str(1.-frac)+"*pbe,pbe",basis="cc-pvtz",num_threads=1,charge=charge)
         fractions_energies_rank[i,1]=cf.calc_Etot_cf()
         print(fractions_energies_rank[i,1])
