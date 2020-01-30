@@ -33,31 +33,29 @@ class Fxc(ModelXC):
 
 
     @vectorize([float64(float64,float64,float64,float64)])
-    def calc_fx3(alpha,beta,gamma,u1):
+    def calc_fx2(alpha,beta,u1,u2):
         """
-        Calculate fx3: -(1+gamma*alpha*u)^2/(1+gamma*|alpha|*u)^2*exp(-beta*gamma*u)
+        Calculate fx2: -1./2.(1/(1+(a*u+b*u^2)^2))+1/(1+(-a*u+b*u^2)^2))
         input:
 
             alpha:float
                 parameter
             beta:float
                 parameter
-            beta:gamma
-                parameter
             u1: array of float:
                 u values
+            u2: array of float:
+                u values **2
 
 
         """
-        return -((1.+gamma*alpha*u1)**2/((1+np.abs(alpha)*gamma*u1)**2))*np.exp(-gamma*beta*u1)
+        return -1./(1.+(alpha*u1+beta*u2)**2)
 
-    def find_gamma(self,gamma,alpha,beta,epsilonX,rhoRU):
+    def find_beta(self,beta,alpha,epsilonX,rhoRU):
         """
-        Target function to find gamma by reproducing epsilon_x 
-        and alpha beta are constants which will normalize the hole and reproduce eps_x lsd in the LSD limit
+        Target function to find bete by reproducing epsilon_x 
+        and alpha is to reproduce the exact curvature
         Input:
-            gamma:float
-                paramter
             alpha:float
                 parameter
             beta: float
@@ -72,11 +70,13 @@ class Fxc(ModelXC):
                int_0^maxu 2*pi*u*rho(r,u)*fx2 du - epsilonX
 
         """
-        fx3 = self.calc_fx3(alpha,beta,gamma,self.ux_pow[1])
-        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx3*rhoRU)-epsilonX
+        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
+        condition= 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx2*rhoRU)-epsilonX
+        print(alpha,beta,condition)
+        return condition
 
 
-    def calc_fx(self,epsilonX,rhoR,rhoRU):
+    def calc_fx(self,epsilonX,Q,rhoR,lap,rhoRU):
         """
         To calculate gamma using a root finding algorithm to reproduce exact exchange energy density
         input:
@@ -84,19 +84,19 @@ class Fxc(ModelXC):
                 exchange energy density to reproduce
             norm:float
                 normalisation to reproduce
+            Q:float
+                for the curvature condition
             rhoRU: array of float
                 spherically averaged energy density
         output:
             fx:array of float
                 the exchange factor for each u
         """
-        kf = (3.*np.pi**2*rhoR)**(1./3.)
-        alpha = -0.11335749522734706*kf
-        beta = 0.4644202728603701*kf
-        gamma= scipy.optimize.brentq(self.find_gamma,0,1000,args=(alpha,beta,epsilonX,rhoRU))
-        fx3 = self.calc_fx3(alpha,beta,gamma,self.ux_pow[1])
-        print(4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx3*rhoRU))
-        return fx3
+        alpha=np.sqrt((-Q+1./6.*lap)/(2.*rhoR))
+        beta= scipy.optimize.brentq(self.find_beta,-0.0001,1000,args=(alpha,epsilonX,rhoRU))
+        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
+        print(alpha,beta,4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx2*rhoRU))
+        return fx2
 
     ####for correlation######################
     def calc_A(self,rs,zeta):
@@ -149,24 +149,18 @@ class Fxc(ModelXC):
         #for correlation factor
         A = self.calc_A(self.rs[gridID],self.zeta[gridID])
         B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
-
         #for exact exchange
-        
-        if self.mol.nelectron==1:
-            self.fx_up=-1.
-            self.fx_down=0.
-        elif self.mol.nelectron==2:
-            self.fx_up=-1.
-            self.fx_down=-1.
-        elif self.mol.nelectron==3:
-            self.fx_up=self.calc_fx(self.eps_x_exact_up[gridID],self.rho_up[gridID],self.rhoRUA[gridID])
-            self.fx_down=-1.
-        else:
-            self.fx_up=self.calc_fx(self.eps_x_exact_up[gridID],self.rho_up[gridID],self.rhoRUA[gridID])
-            if self.mol.spin>0:
-                self.fx_down = self.calc_fx(self.eps_x_exact_down[gridID],self.rho_down[gridID],self.rhoRUB[gridID])
+        self.fx_up=self.calc_fx(self.eps_x_exact_up[gridID],self.Q_up[gridID],self.rho_up[gridID],
+                                                                self.lap_up[gridID],self.rhoRUA[gridID])
+
+        if self.mol.spin>0:
+            if self.mol.nelectron==1:
+                self.fx_down=0.
             else:
-                self.fx_down=self.fx_up
+                self.fx_down = self.calc_fx(self.eps_x_exact_down[gridID],self.Q_down[gridID],
+                                    self.rho_down[gridID],self.lap_down[gridID],self.rhoRUB[gridID])
+        else:
+            self.fx_down=self.fx_up
         self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
                         1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #renormalize
