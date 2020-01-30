@@ -299,8 +299,8 @@ class CF(ModelXC):
             self.E=self.E*(1.-self.sicA)
 
         if self.method=='cf3':
-       	 self.E=0.0
-         self.D=0.0
+       	    self.E=0.0
+            self.D=0.0
         
         #to calculate C and energy 
         m1 = self.moment_JX_E(self.E,1,self.JX_Exact)

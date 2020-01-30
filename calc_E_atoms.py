@@ -48,7 +48,7 @@ def calc_E_cf(atom,positions,spin,method):
         model_dict:dict
             atom_name:energy
     """
-    cf = CF(atom,positions,atoms[atom],method,approx='pbe,pbe',basis="cc-pvtz")
+    cf = CF(atom,positions,atoms[atom],method,approx='pbe,pbe',basis="6-311+g2dp.nw")
     E = cf.calc_Etot_cf()
     model_dict = {atom:E}
     print(model_dict)
