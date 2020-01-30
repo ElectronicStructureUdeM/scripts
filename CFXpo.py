@@ -125,6 +125,9 @@ class CF(ModelXC):
                                             br03_a_down,br03_b_down,
                                             br03_c_down,0)
 
+    def calc_fc(self,A,B,C,D,E,y_values):
+        return (A+B*y_values+C*y_values**2+D*y_values**4)*np.exp(-E*y_values**2)
+
     def calc_A(self,rs,zeta):
         """
         Calculate A which is used to reproduce the on-top value of rho_xc of LSD
@@ -312,8 +315,6 @@ class CF(ModelXC):
         self.C = -(3.*np.pi/4.+m2*self.A+m3*self.B+m6*self.D)/m4
         self.eps_xc_calc = 2.*np.pi*self.rho_tot[gridID]/self.kf[gridID]**2*(self.A*m1+
                                         self.B*m2+self.C*m3+self.D*m5)
-                                        
-
         return self.eps_xc_calc
    
     def calc_Exc_cf(self):

@@ -47,6 +47,16 @@ class ModelXC:
         self.mf.xc=self.approx
         self.mf.kernel()
         self.f = h5py.File("/media/etienne/LACIE_SHARE/phd/rhoru/maxu30/10000/"+self.mol_name+".h5",'r')
+        self.ux = np.array(self.f.get('ux'))
+        self.uwei = np.array(self.f.get('uwei'))
+        self.rhoRUA = np.array(self.f.get('rhoRUA'))
+        if self.mol.spin==0:
+            self.rhoRUB=self.rhoRUA
+        else:
+            self.rhoRUB = np.array(self.f.get('rhoRUB'))
+        self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
+                        5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
+
         self.approx_E_tot = np.array(self.f.get("Etot"))
         self.approx_Exc = self.mf.get_veff().exc
         if (self.mol.spin==0):
@@ -121,6 +131,8 @@ class ModelXC:
         self.tauw = (self.GA+self.GB+2.*self.GC)/(8.*self.rho_tot)
         self.taur = self.tau_up + self.tau_down
         self.tauratio = self.tauw/self.taur 
+        self.f.close()
+
     def compute_ex_exact(self,ao_value,dm,coord):
         """
         Function to compute the exact kohn sham exchange energy density
