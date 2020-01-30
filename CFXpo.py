@@ -43,7 +43,7 @@ class CF(ModelXC):
                               4:self.y_values**4,5:self.y_values**5,6:self.y_values**6}
 
     
-    def calc_BRXN_params(self,rho,eps_x):
+    def calc_BRXN_params_spin(self,rho,eps_x):
         """
         To calculate the parameters of the becke roussel normalized echange
         hole which reproduces an energy density from an approximation
@@ -62,10 +62,11 @@ class CF(ModelXC):
         d = d/kf**4
         return a,b,c,d
     
-    def calc_jx_approx(self,gridID,eps_x_up,eps_x_down):
+    def calc_BRXN_params(self,gridID,eps_x_up,eps_x_down):
         """
         Calculate the total reduced exchange hole BR exchange hole which reproduces
         the exchange energy density per particle of an approximation
+        This function calculate it for both spins
 
         Input:
             gridID:current grid point ID
@@ -75,18 +76,54 @@ class CF(ModelXC):
             jx: total reduced exchange hole
 
         """
-        br_a_up,br_b_up,br_c_up,br_d_up = self.calc_BRXN_params(self.rho_up[gridID],
+        br_a_up,br_b_up,br_c_up,br_d_up = self.calc_BRXN_params_spin(self.rho_up[gridID],
                                                                     eps_x_up)
         
         if (self.mol.spin>0 and self.mol.nelectron>1):
-            br_a_down,br_b_down,br_c_down,br_d_down = self.calc_BRXN_params(self.rho_down[gridID],
+            br_a_down,br_b_down,br_c_down,br_d_down = self.calc_BRXN_params_spin(self.rho_down[gridID],
                                                                 eps_x_down)
         elif self.mol.nelectron==1:#for hydrogen or one electron system
             br_a_down,br_b_down,br_c_down,br_d_down=(0.,0.,0.,0.)
         else:
             br_a_down,br_b_down,br_c_down,br_d_down=(br_a_up,br_b_up,br_c_up,br_d_up)
-        return  brholedtot(self.y_values,self.zeta[gridID],br_a_up,br_b_up,br_c_up,br_d_up,
-                                br_a_down,br_b_down,br_c_down,br_d_down)
+        return {"up":[br_a_up,br_b_up,br_c_up,br_d_up],"down":[br_a_down,br_b_down,br_c_down,br_d_down]}
+
+    def calc_jx_method(self,gridID,y_values):
+                 #For cfxN begin
+        if self.method=="cfxn" or self.method=="cfxav" or self.method=="cfxav_sicA":
+            self.JX_Exact = brholedtot(y_values,self.zeta[gridID],self.brxn_params_EXACT["up"][0],
+                                                self.brxn_params_EXACT["up"][1],self.brxn_params_EXACT["up"][2],
+                                                self.brxn_params_EXACT["up"][3],self.brxn_params_EXACT["down"][0],
+                                                self.brxn_params_EXACT["down"][1],self.brxn_params_EXACT["down"][2],
+                                                self.brxn_params_EXACT["down"][3])
+        # for cfxn end
+        if self.method=="cfx" or self.method=="cf3" or self.method=="cfxav" or self.method=="cfxav_sicA":
+            #for cfx begin
+            kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
+            kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
+            br03_a_up = self.br_a_up[gridID]/kfa
+            br03_b_up = self.br_b_up[gridID]*kfa
+            br03_c_up = self.br_c_up[gridID]/self.rho_up[gridID]
+            if self.mol.nelectron>1:
+                br03_a_down = self.br_a_down[gridID]/kfb
+                br03_b_down = self.br_b_down[gridID]*kfb
+                br03_c_down = self.br_c_down[gridID]/self.rho_down[gridID]
+            else:
+                br03_a_down=0.
+                br03_b_down=0.
+                br03_c_down=0.
+            if self.method=="cfx" or self.method=="cf3":
+             self.JX_Exact = brholedtot(y_values,self.zeta[gridID],br03_a_up,
+                                            br03_b_up,br03_c_up,0.,
+                                            br03_a_down,br03_b_down,
+                                            br03_c_down,0)
+            if self.method=="cfxav" or self.method=="cfxav_sicA":
+                self.lambd=0.201
+                self.JX_Exact = self.lambd*self.JX_Exact
+                self.JX_Exact = self.JX_Exact + (1.0-self.lambd)*brholedtot(y_values,self.zeta[gridID],br03_a_up,
+                                            br03_b_up,br03_c_up,0.,
+                                            br03_a_down,br03_b_down,
+                                            br03_c_down,0)
 
     def calc_A(self,rs,zeta):
         """
@@ -226,63 +263,40 @@ class CF(ModelXC):
         self.B = self.calc_B(self.rs[gridID],self.zeta[gridID])
         if self.method=="cfx" or self.method=="cfxn" or self.method=="cfxav" or self.method=="cfxav_sicA":
          # for jx lsd
-         self.JX_LSD = self.calc_jx_approx(gridID,self.eps_x_LSD_up[gridID],self.eps_x_LSD_down[gridID])
+         self.brxn_params_lsd = self.calc_BRXN_params(gridID,self.eps_x_LSD_up[gridID],self.eps_x_LSD_down[gridID])
+         self.JX_LSD = brholedtot(self.y_values,self.zeta[gridID],self.brxn_params_lsd["up"][0],
+                                            self.brxn_params_lsd["up"][1],self.brxn_params_lsd["up"][2],
+                                            self.brxn_params_lsd["up"][3],self.brxn_params_lsd["down"][0],
+                                            self.brxn_params_lsd["down"][1],self.brxn_params_lsd["down"][2],
+                                            self.brxn_params_lsd["down"][3])
          # for fc lsd
          self.E=self.calc_E(self.rho_tot[gridID],self.kf[gridID],self.eps_xc_LSD[gridID])
 
          #for jx pbe
-         self.JX_PBE = self.calc_jx_approx(gridID,self.eps_x_PBE_up[gridID],self.eps_x_PBE_down[gridID])
-
+         self.brxn_params_PBE = self.calc_BRXN_params(gridID,self.eps_x_PBE_up[gridID],self.eps_x_PBE_down[gridID])
+         self.JX_PBE = brholedtot(self.y_values,self.zeta[gridID],self.brxn_params_PBE["up"][0],
+                                            self.brxn_params_PBE["up"][1],self.brxn_params_PBE["up"][2],
+                                            self.brxn_params_PBE["up"][3],self.brxn_params_PBE["down"][0],
+                                            self.brxn_params_PBE["down"][1],self.brxn_params_PBE["down"][2],
+                                            self.brxn_params_PBE["down"][3])
          #for C,D pbe
          self.C,self.D=self.calc_CD(self.rho_tot[gridID],
                                                 self.kf[gridID],self.eps_xc_PBE[gridID])
         
-         #for jx exact
-         #For cfxN begin
-        if self.method=="cfxn":
-            self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
-                                                  self.eps_x_exact_down[gridID])
-        # for cfxn end
-        elif self.method=="cfx" or self.method=="cf3" or self.method=="cfxav" or self.method=="cfxav_sicA":
-            #for cfx begin
-            kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
-            kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
-            br03_a_up = self.br_a_up[gridID]/kfa
-            br03_b_up = self.br_b_up[gridID]*kfa
-            br03_c_up = self.br_c_up[gridID]/self.rho_up[gridID]
-            if self.mol.nelectron>1:
-                br03_a_down = self.br_a_down[gridID]/kfb
-                br03_b_down = self.br_b_down[gridID]*kfb
-                br03_c_down = self.br_c_down[gridID]/self.rho_down[gridID]
-            else:
-                br03_a_down=0.
-                br03_b_down=0.
-                br03_c_down=0.
-            if self.method=="cfx" or self.method=="cf3":
-             self.JX_Exact = brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
-                                            br03_b_up,br03_c_up,0.,
-                                            br03_a_down,br03_b_down,
-                                            br03_c_down,0)
-            if self.method=="cfxav" or self.method=="cfxav_sicA":
-                self.lambd=0.201
-                self.JX_Exact = self.lambd*self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
-                                                  self.eps_x_exact_down[gridID])
-                self.JX_Exact = self.JX_Exact + (1.0-self.lambd)*brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
-                                            br03_b_up,br03_c_up,0.,
-                                            br03_a_down,br03_b_down,
-                                            br03_c_down,0)
-            if self.method=="cfxav_sicA":
-                self.a_bryn=-0.30
-                self.a_bryc=0.30
-                self.a_avg = self.lambd*self.a_bryn+(1.-self.lambd)*self.a_bryc
-                self.b_sic = 1.-self.a_avg
-                self.sicA = self.a_avg+self.b_sic*self.zeta[gridID]**2*self.tauratio[gridID]**2
-                self.D=self.D*(1.-self.sicA)
-                self.E=self.E*(1.-self.sicA)
-            #for cfx end
-        else:
-            print(self.method)
-            exit("Method does not exist")
+         #for jx of the models which reproduces exact exchange
+        if self.method=="cfxn" or self.method=="cfxav" or self.method=="cfxav_sicA":
+            self.brxn_params_EXACT = self.calc_BRXN_params(gridID,self.eps_x_exact_up[gridID],self.eps_x_exact_down[gridID])
+        self.calc_jx_method(gridID,self.y_values)
+        
+        # correction to paramters of fc
+        if self.method=="cfxav_sicA":
+            self.a_bryn=-0.30
+            self.a_bryc=0.30
+            self.a_avg = self.lambd*self.a_bryn+(1.-self.lambd)*self.a_bryc
+            self.b_sic = 1.-self.a_avg
+            self.sicA = self.a_avg+self.b_sic*self.zeta[gridID]**2*self.tauratio[gridID]**2
+            self.D=self.D*(1.-self.sicA)
+            self.E=self.E*(1.-self.sicA)
 
         if self.method=='cf3':
        	 self.E=0.0
