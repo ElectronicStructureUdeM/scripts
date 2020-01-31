@@ -125,8 +125,9 @@ class CF(ModelXC):
                                             br03_a_down,br03_b_down,
                                             br03_c_down,0)
 
-    def calc_fc(self,A,B,C,D,E,y_values):
-        return (A+B*y_values+C*y_values**2+D*y_values**4)*np.exp(-E*y_values**2)
+    def calc_fc(self,keff):
+        return (self.A+self.B*self.ux_pow[1]*keff+self.C*self.ux_pow[2]*keff**2+
+                            self.D*self.ux_pow[4]*keff**4)*np.exp(-self.E*self.ux_pow[2]*keff**2)
 
     def calc_A(self,rs,zeta):
         """
@@ -253,6 +254,20 @@ class CF(ModelXC):
         self.eps_xc_PBE_calc=2.*np.pi*rho/kf**2*(self.A*m1+self.B*m2+C*m3+D*m5)
         return C,D
 
+    def find_keff(self,keff,gridID):
+        """
+        find keff to normalize the exchange correlation hole
+        """
+        self.fc = self.calc_fc(keff)
+        self.calc_jx_method(gridID,keff*self.rhoRU[gridID])
+        condition = 4.*np.pi*np.sum(self.fc*self.JX_Exact*self.rhoRU[gridID]*self.uwei*self.ux_pow[2]) +1.
+        return condition
+
+    def calc_keff(self,gridID):
+        sol = scipy.optimize.root_scalar(self.find_keff,bracket=[1e-10,1e10], 
+                                    method = 'brentq',args=(gridID))
+        return sol.root
+        
     def calc_eps_xc_cf(self,gridID):
         """
         To calculate the XC energy density per particle for CF.
@@ -313,8 +328,8 @@ class CF(ModelXC):
         m5 = self.moment_JX_E(self.E,5,self.JX_Exact)
         m6 = self.moment_JX_E(self.E,6,self.JX_Exact)
         self.C = -(3.*np.pi/4.+m2*self.A+m3*self.B+m6*self.D)/m4
-        self.eps_xc_calc = 2.*np.pi*self.rho_tot[gridID]/self.kf[gridID]**2*(self.A*m1+
-                                        self.B*m2+self.C*m3+self.D*m5)
+        keff = self.calc_keff(gridID)
+        self.eps_xc_calc = 2.*np.pi*np.sum(self.fc*self.JX_Exact*self.rhoRU[gridID]*self.uwei*self.ux_pow[1])
         return self.eps_xc_calc
    
     def calc_Exc_cf(self):

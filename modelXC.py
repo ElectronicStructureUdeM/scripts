@@ -56,6 +56,10 @@ class ModelXC:
             self.rhoRUB = np.array(self.f.get('rhoRUB'))
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
+        if self.mol.nelectron>1:
+            self.rhoRU=self.rhoRUA+self.rhoRUB
+        else:
+            self.rhoRU=self.rhoRUA
 
         self.approx_E_tot = np.array(self.f.get("Etot"))
         self.approx_Exc = self.mf.get_veff().exc
