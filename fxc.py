@@ -32,34 +32,20 @@ class Fxc(ModelXC):
         self.eps_xc_post_approx = self.exc_post_approx/self.rho_tot
 
 
-    @vectorize([float64(float64,float64,float64,float64)])
-    def calc_fx2(alpha,beta,u1,u2):
+    @vectorize([float64(float64,float64)])
+    def calc_fx1(gamma,u2):
         """
-        Calculate fx2: -1./2.(1/(1+(a*u+b*u^2)^2))+1/(1+(-a*u+b*u^2)^2))
-        input:
-
-            alpha:float
-                parameter
-            beta:float
-                parameter
-            u1: array of float:
-                u values
-            u2: array of float:
-                u values **2
+        Calculate fx1:-exp(-gamma*u**2)
 
 
         """
-        return -1./(1.+(alpha*u1+beta*u2)**2)
+        return -np.exp(-gamma*u2)
 
-    def find_beta(self,beta,alpha,epsilonX,rhoRU):
+    def find_gamma(self,gamma,epsilonX,rhoRU):
         """
-        Target function to find bete by reproducing epsilon_x 
-        and alpha is to reproduce the exact curvature
+        Target function to find gamma by reproducing epsilon_x 
         Input:
-            alpha:float
-                parameter
-            beta: float
-                parameter
+            gamma:parameter
             epsilonX: float
                 exchange energy density to reproduce
 
@@ -67,13 +53,11 @@ class Fxc(ModelXC):
                 all the rho(r,u) for a r
         return:
             array with:
-               int_0^maxu 2*pi*u*rho(r,u)*fx2 du - epsilonX
+               int_0^maxu 2*pi*u*rho(r,u)*fx1 du - epsilonX
 
         """
-        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
-        condition= 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx2*rhoRU)-epsilonX
-        print(alpha,beta,condition)
-        return condition
+        fx1 = self.calc_fx1(gamma,self.ux_pow[2])
+        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx1*rhoRU)-epsilonX
 
 
     def calc_fx(self,epsilonX,Q,rhoR,lap,rhoRU):
@@ -92,11 +76,9 @@ class Fxc(ModelXC):
             fx:array of float
                 the exchange factor for each u
         """
-        alpha=np.sqrt((-Q+1./6.*lap)/(2.*rhoR))
-        beta= scipy.optimize.brentq(self.find_beta,-0.0001,1000,args=(alpha,epsilonX,rhoRU))
-        fx2 = self.calc_fx2(alpha,beta,self.ux_pow[1],self.ux_pow[2])
-        print(alpha,beta,4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx2*rhoRU))
-        return fx2
+        gamma= scipy.optimize.brentq(self.find_gamma,-1e-3,1000,args=(epsilonX,rhoRU))
+        fx1 = self.calc_fx1(gamma,self.ux_pow[2])
+        return fx1
 
     ####for correlation######################
     def calc_A(self,rs,zeta):
@@ -161,8 +143,16 @@ class Fxc(ModelXC):
                                     self.rho_down[gridID],self.lap_down[gridID],self.rhoRUB[gridID])
         else:
             self.fx_down=self.fx_up
-        self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
-                        1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
+        if self.mol.nelectron>1:
+            f_b03_up = (1. - self.br_n_up[gridID])/self.br_n_down[gridID]
+            f_b03_down = (1. - self.br_n_down[gridID])/self.br_n_up[gridID]
+            f_b03 = np.min([f_b03_up,f_b03_down,1.])
+        else:
+            f_b03=0.
+        self.rho_x_up = self.fx_up*self.rhoRUA[gridID]+f_b03*self.fx_down*self.rhoRUB[gridID]
+        self.rho_x_down = self.fx_down*self.rhoRUB[gridID]+f_b03*self.fx_up*self.rhoRUA[gridID]
+        self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.rho_x_up+\
+                        1./2.*(1.-self.zeta[gridID])*self.rho_x_down
         #renormalize
         m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
         m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
