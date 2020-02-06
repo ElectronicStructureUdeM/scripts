@@ -121,7 +121,31 @@ class Fxc(ModelXC):
         fc = (A+B*u+C*u**2+D*u**4)*exp(-E*u**2)
         """
         return (A+B*self.ux_pow[1]+C*self.ux_pow[2]+D*self.ux_pow[4])*np.exp(-E*self.ux_pow[2])
+    
+    def find_alpha(self,alpha,rho_x):
+        norm = 4.*np.pi*np.sum(self.uwei*rho_x*self.ux_pow[2]*np.exp(-alpha*self.ux_pow[2]))
+        return 1.+norm
 
+    def calc_rho_x(self,gridID):
+        rho_x_up = self.fx_up*self.rhoRUA[gridID]+self.f_b03*self.fx_down*self.rhoRUB[gridID]
+        try:
+            alpha_up=scipy.optimize.brentq(self.find_alpha,0,1000,args=(rho_x_up))
+        except ValueError:
+            alpha_up=0.
+        if self.mol.nelectron==1:
+            rho_x_down=0.
+            alpha_down=0.
+        elif self.mol.spin>1:
+            rho_x_down = self.fx_down*self.rhoRUB[gridID]+self.f_b03*self.fx_up*self.rhoRUA[gridID]
+            try:
+                alpha_down=scipy.optimize.brentq(self.find_alpha,0,1000,args=(rho_x_down))
+            except ValueError:
+                alpha_down=0.
+        else:
+            rho_x_down=rho_x_up
+            alpha_down=alpha_up
+        self.rho_x = 1./2.*(1.+self.zeta[gridID])*rho_x_up*np.exp(-alpha_up*self.ux_pow[2])+\
+                    1./2.*(1.-self.zeta[gridID])*rho_x_down*np.exp(-alpha_down*self.ux_pow[2])
     def calc_exc_fxc(self,gridID):
         """
         To calculate exc for the model for a grid point
@@ -146,19 +170,17 @@ class Fxc(ModelXC):
         if self.mol.nelectron>1:
             f_b03_up = (1. - self.br_n_up[gridID])/self.br_n_down[gridID]
             f_b03_down = (1. - self.br_n_down[gridID])/self.br_n_up[gridID]
-            f_b03 = np.min([f_b03_up,f_b03_down,1.])
+            self.f_b03 = np.min([f_b03_up,f_b03_down,1.])
         else:
-            f_b03=0.
-        self.rho_x_up = self.fx_up*self.rhoRUA[gridID]+f_b03*self.fx_down*self.rhoRUB[gridID]
-        self.rho_x_down = self.fx_down*self.rhoRUB[gridID]+f_b03*self.fx_up*self.rhoRUA[gridID]
-        self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.rho_x_up+\
-                        1./2.*(1.-self.zeta[gridID])*self.rho_x_down
+            self.f_b03=0.
+
+        self.calc_rho_x(gridID)
+
         #renormalize
         m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
         m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
         m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
         m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
-        
         C = (-1/(4.*np.pi)-A*m2-B*m3)/m4        
         
         eps_xc = 2.*np.pi*(m1*A+B*m2+C*m3)
