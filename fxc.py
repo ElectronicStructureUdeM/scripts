@@ -57,7 +57,7 @@ class Fxc(ModelXC):
 
         """
         fx1 = self.calc_fx1(gamma,self.ux_pow[2])
-        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx1*rhoRU)-epsilonX
+        return 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx1*rhoRU)+1
 
 
     def calc_fx(self,epsilonX,Q,rhoR,lap,rhoRU):
@@ -128,19 +128,13 @@ class Fxc(ModelXC):
 
     def calc_rho_x(self,gridID):
         rho_x_up = self.fx_up*self.rhoRUA[gridID]+self.f_b03*self.fx_down*self.rhoRUB[gridID]
-        try:
-            alpha_up=scipy.optimize.brentq(self.find_alpha,0,1000,args=(rho_x_up))
-        except ValueError:
-            alpha_up=0.
+        alpha_up=scipy.optimize.brentq(self.find_alpha,-1,1000,args=(rho_x_up))
         if self.mol.nelectron==1:
             rho_x_down=0.
             alpha_down=0.
         elif self.mol.spin>1:
             rho_x_down = self.fx_down*self.rhoRUB[gridID]+self.f_b03*self.fx_up*self.rhoRUA[gridID]
-            try:
-                alpha_down=scipy.optimize.brentq(self.find_alpha,0,1000,args=(rho_x_down))
-            except ValueError:
-                alpha_down=0.
+            alpha_down=scipy.optimize.brentq(self.find_alpha,-1,1000,args=(rho_x_down))
         else:
             rho_x_down=rho_x_up
             alpha_down=alpha_up
@@ -167,15 +161,17 @@ class Fxc(ModelXC):
                                     self.rho_down[gridID],self.lap_down[gridID],self.rhoRUB[gridID])
         else:
             self.fx_down=self.fx_up
-        if self.mol.nelectron>1:
-            f_b03_up = (1. - self.br_n_up[gridID])/self.br_n_down[gridID]
-            f_b03_down = (1. - self.br_n_down[gridID])/self.br_n_up[gridID]
-            self.f_b03 = np.min([f_b03_up,f_b03_down,1.])
-        else:
-            self.f_b03=0.
-
-        self.calc_rho_x(gridID)
-
+        #if self.mol.nelectron>1:
+        #    f_b03_up = (1. - self.br_n_up[gridID])/self.br_n_down[gridID]
+        #    f_b03_down = (1. - self.br_n_down[gridID])/self.br_n_up[gridID]
+        #    self.f_b03 = np.min([f_b03_up,f_b03_down,1.])
+        #    if self.f_b03<0:
+        #        self.f_b03=0.
+        #else:
+        #    self.f_b03=0.
+        #self.calc_rho_x(gridID)
+        self.rho_x = 1./2.*(1.+self.zeta[gridID])*self.fx_up*self.rhoRUA[gridID]+\
+                    1./2.*(1.-self.zeta[gridID])*self.fx_down*self.rhoRUB[gridID]
         #renormalize
         m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
         m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
@@ -183,7 +179,8 @@ class Fxc(ModelXC):
         m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
         C = (-1/(4.*np.pi)-A*m2-B*m3)/m4        
         
-        eps_xc = 2.*np.pi*(m1*A+B*m2+C*m3)
+        #eps_xc = 2.*np.pi*(m1*A+B*m2+C*m3)
+        eps_xc = 2.*np.pi*m1
         return  eps_xc*self.rho_tot[gridID]
 
 
