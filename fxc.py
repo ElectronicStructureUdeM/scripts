@@ -15,7 +15,7 @@ class Fxc(ModelXC):
     C by normalising the xc hole
 
     """
-    def __init__(self,molecule,positions,spin,approx='tpss,tpss',basis='6-311+g2dp.nw',num_threads=1):
+    def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1):
         super().__init__(molecule,positions,spin,approx,basis,num_threads)
         self.calc_eps_xks_post_approx()#for exks
         self.ux = np.array(self.f.get('ux'))
@@ -30,6 +30,7 @@ class Fxc(ModelXC):
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
         self.calc_eps_xc_post_approx(approx)
         self.eps_xc_post_approx = self.exc_post_approx/self.rho_tot
+        self.eps_xc_calc = np.zeros(self.n_grid)
 
 
     @vectorize([float64(float64,float64,float64,float64,float64,float64,float64)])
@@ -181,10 +182,12 @@ class Fxc(ModelXC):
         m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
         m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
         m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
-        C = (-1/(4.*np.pi)-A*m2-B*m3)/m4       
-        eps_xc = 2.*np.pi*(m1*A+B*m2+C*m3)
+        C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
+        self.eps_xc_calc[gridID] = 2.*np.pi*(m1*A+B*m2+C*m3)
+        #print(eps_xc*self.rho_tot[gridID],self.eps_x_exact_up[gridID]*self.rho_tot[gridID])       
+
         #eps_xc = 2.*np.pi*m1
-        return  eps_xc*self.rho_tot[gridID]
+        return  self.eps_xc_calc[gridID]*self.rho_tot[gridID]
 
 
     def calc_Etot_fxc(self):
@@ -196,6 +199,9 @@ class Fxc(ModelXC):
             sum+=self.calc_exc_fxc(gridID)*self.weights[gridID]
         self.Exc = sum
         self.E_tot_model = self.approx_E_tot-self.approx_Exc+self.Exc
+        plt.scatter(self.rho_tot,self.eps_xc_calc)
+        plt.scatter(self.rho_tot,self.eps_x_exact_up*2)
+        plt.show()
         return self.E_tot_model
 
 
