@@ -29,6 +29,7 @@ class Fxc(ModelXC):
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
         self.calc_eps_xc_post_approx(approx)
+        #self.eps_xc_calc=np.zeros(self.n_grid)
         self.eps_xc_post_approx = self.exc_post_approx/self.rho_tot
 
 
@@ -164,7 +165,7 @@ class Fxc(ModelXC):
         if np.abs(norm_0)<1e-10:
             self.rho_x = rho_x_stat
         else:
-            gamma2 = scipy.optimize.brentq(norm_rho_x_stat,-1e-3,1000)
+            gamma2 = scipy.optimize.brentq(norm_rho_x_stat,0,1000)
             self.rho_x = rho_x_stat*np.exp(-gamma2*self.ux_pow[2])
         
     
@@ -182,8 +183,16 @@ class Fxc(ModelXC):
             self.br_n_down[gridID]=1.
         norm_up=-1.#-self.br_n_up[gridID]
         norm_down=-1.#-self.br_n_down[gridID]
-        self.f_b03_up = (1.-self.br_n_up[gridID])*2.
-        self.f_b03_down = (1.-self.br_n_down[gridID])*2.
+        
+        if self.mol.nelectron>1:
+            self.f_b03_up = (1.-self.br_n_up[gridID])/self.br_n_down[gridID]
+            self.f_b03_down = (1.-self.br_n_down[gridID])/self.br_n_up[gridID]
+            f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
+            self.b_b03_up=f_b03
+            self.f_b03_down=f_b03
+        else:
+            self.f_b03_up = 0.
+            self.f_b03_down=0.
 
         self.fx_up=self.calc_fx(norm_up,self.eps_x_exact_up[gridID],self.Q_up[gridID],self.rho_up[gridID],
                                                                 self.lap_up[gridID],self.rhoRUA[gridID])
@@ -214,10 +223,11 @@ class Fxc(ModelXC):
         m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
         m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
         C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
-        eps_xc_calc = 2.*np.pi*(m1*A+B*m2+C*m3)
+       
+        self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
 
-        #eps_xc_calc = 2.*np.pi*m1
-        return  eps_xc_calc*self.rho_tot[gridID]
+        #self.eps_xc_calc = 2.*np.pi*m1
+        return  self.eps_xc_calc*self.rho_tot[gridID]
 
 
     def calc_Etot_fxc(self):

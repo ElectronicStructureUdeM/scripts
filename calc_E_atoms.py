@@ -4,7 +4,7 @@ import sys
 from fxc import Fxc
 
 #Dictionary with the atoms and it's total spin
-atoms={"H":1,
+atoms={ "H":1,
         "He":0,
         "Li":1,
         "Be":0,"B":1,"C":2,"N":3,
