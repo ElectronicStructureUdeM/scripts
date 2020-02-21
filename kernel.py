@@ -1,6 +1,5 @@
 from pyscf import dft,gto,lib,scf
 import numpy as np
-from numba import vectorize,float64
 
 class KSKernel:
 
@@ -69,6 +68,9 @@ class KSKernel:
         self.Q_up = 0.0
         self.Q_down = 0.0
 
+        eps_x_exact_up = 0.0
+        eps_x_exact_down = 0.0
+
     def CalculateKSKernel(self, mol):
 
         self.mf = scf.KS(mol)
@@ -132,10 +134,16 @@ class KSKernel:
                 self.D_down = self.tau_down*2-(1./4.)*self.gradrho_down/self.rho_down
                 self.Q_down = 1./6.*(self.laprho_down-2.*self.D_down)
 
+        # store some useful quantities
         self.rho = self.rho_up + self.rho_down
         self.zeta = (self.rho_up - self.rho_down) / self.rho
         self.kf = (3. * np.pi**2 * self.rho)**(1. / 3.)
         self.rs = (3. / (4. * np.pi * self.rho))**(1. / 3.)
+
+        # future storage the exact exchange
+        eps_x_exact_up = np.zeros(self.ngrid)
+        eps_x_exact_down = np.zeros(self.ngrid)
+
 
     def GetDM(self):
         return self.dm

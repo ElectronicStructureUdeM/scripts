@@ -44,6 +44,7 @@ def main():
 
         system = systems[key]
 
+        print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
         print(system['name'] + ' 0.0 0.0 0.0')
         coords = system['symbol'] + ' 0.0 0.0 0.0'
 

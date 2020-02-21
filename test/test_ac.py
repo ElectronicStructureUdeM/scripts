@@ -42,6 +42,7 @@ def main():
 
         system = systems[key]
 
+        print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
         print(system['name'] + ' 0.0 0.0 0.0')
         coords = system['symbol'] + ' 0.0 0.0 0.0'
 
@@ -68,7 +69,6 @@ def main():
         ac_xc = exks_ac.CalculateTotalXC()
         print('AC XC = {:.12e} AVG XC = {:.12e}, Error = {:.12e}'.format(ac_xc, xc, (xc - ac_xc)))
 
-        print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
 
     return
 
