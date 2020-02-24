@@ -109,7 +109,7 @@ class Fxc(ModelXC):
         fx4 = self.calc_fx4(alpha,beta,xi,gamma,self.ux_pow[1],self.ux_pow[2],
                             self.ux_pow[4],self.ux_pow[6],umax)
         #print(alpha,beta,gamma)
-        return fx4
+        return fx4,gamma
 
     ####for correlation######################
     def calc_A(self,rs,zeta):
@@ -163,6 +163,7 @@ class Fxc(ModelXC):
                                                     rho_x_stat*np.exp(-gamma2*self.ux_pow[2]))+1.
         norm_0 = norm_rho_x_stat(0)
         if np.abs(norm_0)<1e-10:
+            gamma2=0.
             self.rho_x = rho_x_stat
         else:
             gamma2 = scipy.optimize.brentq(norm_rho_x_stat,0,1000)
@@ -185,26 +186,28 @@ class Fxc(ModelXC):
         norm_down=-1.#-self.br_n_down[gridID]
         
         if self.mol.nelectron>1:
-            self.f_b03_up = (1.-self.br_n_up[gridID])/self.br_n_down[gridID]
-            self.f_b03_down = (1.-self.br_n_down[gridID])/self.br_n_up[gridID]
-            f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
-            self.b_b03_up=f_b03
-            self.f_b03_down=f_b03
+            self.f_b03_up = (1.-self.br_n_up[gridID])*2.
+            self.f_b03_down = (1.-self.br_n_down[gridID])*2.
+            #f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
+            #self.b_b03_up=f_b03
+            #self.f_b03_down=f_b03
         else:
             self.f_b03_up = 0.
             self.f_b03_down=0.
 
-        self.fx_up=self.calc_fx(norm_up,self.eps_x_exact_up[gridID],self.Q_up[gridID],self.rho_up[gridID],
+        self.fx_up,self.gamma_up=self.calc_fx(norm_up,self.eps_x_exact_up[gridID],self.Q_up[gridID],self.rho_up[gridID],
                                                                 self.lap_up[gridID],self.rhoRUA[gridID])
 
         if self.mol.spin>0:
             if self.mol.nelectron==1:
                 self.fx_down=0.
+                self.gamma_down=0.
             else:
-                self.fx_down = self.calc_fx(norm_down,self.eps_x_exact_down[gridID],self.Q_down[gridID],
+                self.fx_down,self.gamma_down = self.calc_fx(norm_down,self.eps_x_exact_down[gridID],self.Q_down[gridID],
                                     self.rho_down[gridID],self.lap_down[gridID],self.rhoRUB[gridID])
         else:
             self.fx_down=self.fx_up
+            self.gamma_down=self.gamma_up
 
 
         self.calc_rho_x(gridID)
@@ -217,16 +220,29 @@ class Fxc(ModelXC):
         #B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
         A = self.calc_A(self.rs[gridID],effective_zeta)
         B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]
+        #
+        if self.mol.nelectron>1:
+            z_length = -(1./self.eps_x_exact_up[gridID]+1./self.eps_x_exact_down[gridID])
+        else:
+            z_length = -1./self.eps_x_exact_up[gridID]
         #renormalize
+
+        gamma_avg = 0.5*(1.+self.zeta[gridID])*self.gamma_up+0.5*(1.-self.zeta[gridID])*self.gamma_down
         m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
         m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
         m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
         m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
         C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
-       
-        self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
 
-        #self.eps_xc_calc = 2.*np.pi*m1
+        self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
+        if self.eps_xc_calc<-5.:
+            plt.scatter(self.ux,self.rho_x*(A+B*self.ux+C*self.ux_pow[2]),label="rhoxc")
+            plt.scatter(self.ux,self.rho_x,label="rhox")
+            plt.scatter(self.ux,-self.rhoRUA[gridID]*2.,label="-rho(r,u)")
+            plt.xlabel("u")
+            plt.legend()
+            plt.show()
+            self.eps_xc_calc=-1
         return  self.eps_xc_calc*self.rho_tot[gridID]
 
 
