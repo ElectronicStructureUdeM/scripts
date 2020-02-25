@@ -5,6 +5,7 @@ from numba import vectorize, float64
 import matplotlib.pyplot as plt
 from scipy import integrate
 import h5py
+from CFXpo import CF
 class Fxc(ModelXC):
     """
     Simple one parameters exchange factor: fx=np.exp(-gamma*u**2)
@@ -31,6 +32,13 @@ class Fxc(ModelXC):
         self.calc_eps_xc_post_approx(approx)
         #self.eps_xc_calc=np.zeros(self.n_grid)
         self.eps_xc_post_approx = self.exc_post_approx/self.rho_tot
+                #for correlation factor
+        self.cfx = CF(self.mol,"cfx",rho={"up":self.rho_up,"down":self.rho_down,"tot":self.rho_tot},
+                 grad={"up":[self.dx_rho_up,self.dy_rho_up,self.dz_rho_up],
+                 "down":[self.dx_rho_down,self.dy_rho_down,self.dz_rho_down]},
+                 eps_x_exact={"up":self.eps_x_exact_up,"down":self.eps_x_exact_down},
+                 br03_params={"up":{"a":self.br_a_up,"b":self.br_b_up,"c":self.br_c_up,"n":self.br_n_up},
+                 "down":{"a":self.br_a_down,"b":self.br_b_down,"c":self.br_c_down,"n":self.br_n_down}})
 
 
     @vectorize([float64(float64,float64,float64,float64,float64,float64,float64,float64,float64)])
@@ -215,34 +223,25 @@ class Fxc(ModelXC):
         ontop_rho_x_stat = 0.5*(1.+self.zeta[gridID])*(self.rho_up[gridID]+self.f_b03_up*self.rho_down[gridID])+\
                       0.5*(1.-self.zeta[gridID])*(self.rho_down[gridID]+self.f_b03_down*self.rho_up[gridID])
         effective_zeta = np.sqrt(2.*ontop_rho_x_stat/self.rho_tot[gridID]-1)
-        #for correlation factor
-        #A = self.calc_A(self.rs[gridID],self.zeta[gridID])
-        #B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
-        A = self.calc_A(self.rs[gridID],effective_zeta)
-        B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]
-        #
-        if self.mol.nelectron>1:
-            z_length = -(1./self.eps_x_exact_up[gridID]+1./self.eps_x_exact_down[gridID])
-        else:
-            z_length = -1./self.eps_x_exact_up[gridID]
-        #renormalize
 
-        gamma_avg = 0.5*(1.+self.zeta[gridID])*self.gamma_up+0.5*(1.-self.zeta[gridID])*self.gamma_down
-        m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
-        m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
-        m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
-        m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
-        C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
+        
+        ##A = self.calc_A(self.rs[gridID],self.zeta[gridID])
+        ##B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
+        #A = self.calc_A(self.rs[gridID],effective_zeta)
+        #B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]
+        ##
+#
+        ##renormalize
+#
+        #gamma_avg = 0.5*(1.+self.zeta[gridID])*self.gamma_up+0.5*(1.-self.zeta[gridID])*self.gamma_down
+        #m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
+        #m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
+        #m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
+        #m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
+        #C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
 
-        self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
-        if self.eps_xc_calc<-5.:
-            plt.scatter(self.ux,self.rho_x*(A+B*self.ux+C*self.ux_pow[2]),label="rhoxc")
-            plt.scatter(self.ux,self.rho_x,label="rhox")
-            plt.scatter(self.ux,-self.rhoRUA[gridID]*2.,label="-rho(r,u)")
-            plt.xlabel("u")
-            plt.legend()
-            plt.show()
-            self.eps_xc_calc=-1
+        #self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
+        self.eps_xc_calc = self.cfx.calc_eps_xc_cf(gridID)
         return  self.eps_xc_calc*self.rho_tot[gridID]
 
 
