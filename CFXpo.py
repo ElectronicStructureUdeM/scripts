@@ -101,7 +101,7 @@ class CF:
         br_a_up,br_b_up,br_c_up,br_d_up = self.calc_BRXN_params(self.rho_up[gridID],
                                                                     eps_x_up)
 
-        if (self.mol.spin>0 and self.mol.nelectron>1 and self.rho_down[gridID]>1e-10):
+        if (self.mol.nelectron>1 and self.rho_down[gridID]>1e-10):
             br_a_down,br_b_down,br_c_down,br_d_down = self.calc_BRXN_params(self.rho_down[gridID],
                                                                 eps_x_down)
         elif self.mol.nelectron==1 or self.rho_down[gridID]<1e-10:#for hydrogen or one electron system
