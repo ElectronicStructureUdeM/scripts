@@ -10,7 +10,7 @@ from locEs import *
 from BRx import *
 
 class CF:
-    def __init__(self,mol,method,rho,grad,eps_x_exact,br03_params):
+    def __init__(self,mol,method,rho,grad,tau,eps_x_exact,br03_params):
         self.mol = mol
         self.method=method
         self.rho_up = rho["up"]
@@ -31,6 +31,13 @@ class CF:
 
         self.eps_x_exact_up=eps_x_exact["up"]
         self.eps_x_exact_down=eps_x_exact["down"]
+
+        self.GA = grad["up"][0]**2+ grad["up"][1]**2+ grad["up"][2]**2
+        self.GB=  grad["down"][0]**2+grad["down"][1]**2+grad["down"][2]**2
+        self.GC = np.sqrt(self.GA*self.GB)
+        self.tauw = (self.GA+self.GB+2.*self.GC)/(8.*self.rho_tot)
+        self.taur = tau["up"] + tau["down"]
+        self.tauratio = self.tauw/self.taur
 
         # to obtain LSD energy densities
         zeros=np.zeros(np.size(self.br03_c_up))
@@ -94,10 +101,10 @@ class CF:
         br_a_up,br_b_up,br_c_up,br_d_up = self.calc_BRXN_params(self.rho_up[gridID],
                                                                     eps_x_up)
 
-        if (self.mol.spin>0 and self.mol.nelectron>1):
+        if (self.mol.spin>0 and self.mol.nelectron>1 and self.rho_down[gridID]>1e-10):
             br_a_down,br_b_down,br_c_down,br_d_down = self.calc_BRXN_params(self.rho_down[gridID],
                                                                 eps_x_down)
-        elif self.mol.nelectron==1:#for hydrogen or one electron system
+        elif self.mol.nelectron==1 or self.rho_down[gridID]<1e-10:#for hydrogen or one electron system
             br_a_down,br_b_down,br_c_down,br_d_down=(0.,0.,0.,0.)
         else:
             br_a_down,br_b_down,br_c_down,br_d_down=(br_a_up,br_b_up,br_c_up,br_d_up)
@@ -266,7 +273,7 @@ class CF:
             br03_a_up = self.br03_a_up[gridID]/kfa
             br03_b_up = self.br03_b_up[gridID]*kfa
             br03_c_up = self.br03_c_up[gridID]/self.rho_up[gridID]
-            if self.mol.nelectron>1:
+            if self.mol.nelectron>1 and self.rho_down[gridID]>1e-10:
                 br03_a_down = self.br03_a_down[gridID]/kfb
                 br03_b_down = self.br03_b_down[gridID]*kfb
                 br03_c_down = self.br03_c_down[gridID]/self.rho_down[gridID]

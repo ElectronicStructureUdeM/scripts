@@ -64,7 +64,7 @@ def brhparam(Q,rho,epsx):
     a = np.zeros(size)
     b = np.zeros(size)
     c = np.zeros(size)
-    n = np.zeros(size)
+    n = np.ones(size)
     for gridID in range(size):
         if rho[gridID] > 6e-10:
          Qp = Q[gridID]/(rho[gridID]**2) * epsx[gridID]

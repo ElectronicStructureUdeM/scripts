@@ -29,16 +29,9 @@ class Fxc(ModelXC):
         self.f.close()
         self.ux_pow = {1:self.ux,2:self.ux**2,3:self.ux**3,4:self.ux**4,
                         5:self.ux**5,6:self.ux**6,7:self.ux**7,8:self.ux**8}#all the important power of ux
-        self.calc_eps_xc_post_approx(approx)
         #self.eps_xc_calc=np.zeros(self.n_grid)
-        self.eps_xc_post_approx = self.exc_post_approx/self.rho_tot
                 #for correlation factor
-        self.cfx = CF(self.mol,"cfx",rho={"up":self.rho_up,"down":self.rho_down,"tot":self.rho_tot},
-                 grad={"up":[self.dx_rho_up,self.dy_rho_up,self.dz_rho_up],
-                 "down":[self.dx_rho_down,self.dy_rho_down,self.dz_rho_down]},
-                 eps_x_exact={"up":self.eps_x_exact_up,"down":self.eps_x_exact_down},
-                 br03_params={"up":{"a":self.br_a_up,"b":self.br_b_up,"c":self.br_c_up,"n":self.br_n_up},
-                 "down":{"a":self.br_a_down,"b":self.br_b_down,"c":self.br_c_down,"n":self.br_n_down}})
+
 
 
     @vectorize([float64(float64,float64,float64,float64,float64,float64,float64,float64,float64)])
@@ -163,20 +156,67 @@ class Fxc(ModelXC):
     
 
     def calc_rho_x(self,gridID):
-        self.rho_x_stat_up = self.fx_up*self.rhoRUA[gridID]+self.f_b03_up*self.fx_down*self.rhoRUB[gridID]
-        self.rho_x_stat_down = self.fx_down*self.rhoRUB[gridID]+self.f_b03_down*self.fx_up*self.rhoRUA[gridID]
+        self.rho_x_stat_up = self.fx_up*self.rhoRUA[gridID]+self.f_b03_up[gridID]*self.fx_down*self.rhoRUB[gridID]
+        self.rho_x_stat_down = self.fx_down*self.rhoRUB[gridID]+self.f_b03_down[gridID]*self.fx_up*self.rhoRUA[gridID]
         rho_x_stat = 1./2.*(1.+self.zeta[gridID])*self.rho_x_stat_up+\
                     1./2.*(1.-self.zeta[gridID])*self.rho_x_stat_down
         norm_rho_x_stat = lambda gamma2: 4.*np.pi*np.sum(self.uwei*self.ux_pow[2]*
                                                     rho_x_stat*np.exp(-gamma2*self.ux_pow[2]))+1.
         norm_0 = norm_rho_x_stat(0)
-        if np.abs(norm_0)<1e-10:
+        if np.abs(norm_0)<1e-10:#if the error is already small, skip root finding
             gamma2=0.
             self.rho_x = rho_x_stat
         else:
             gamma2 = scipy.optimize.brentq(norm_rho_x_stat,0,1000)
             self.rho_x = rho_x_stat*np.exp(-gamma2*self.ux_pow[2])
         
+    def calc_zeta_eff(self):
+        """
+        To calculate an effective polarisation,
+        from calculating the on-top value of the hole using a procedure 
+        similar to B03
+        """
+        self.br_n_up[self.br_n_up>1.]=1. #issues if normalisation is below <-1
+        self.br_n_down[self.br_n_down>1.]=1.
+        if self.mol.nelectron>1:
+            self.f_b03_up = (1.-self.br_n_up)/self.br_n_down
+            self.f_b03_down = (1.-self.br_n_down)/self.br_n_up
+            ones = np.ones(self.n_grid)
+            f_b03 = np.minimum(self.f_b03_up,self.f_b03_down)
+            f_b03 = np.minimum(f_b03,ones)
+            self.f_b03_up=f_b03
+            self.f_b03_down=f_b03
+        else:
+            self.f_b03_up = np.zeros(self.n_grid)
+            self.f_b03_down= np.zeros(self.n_grid)
+        ontop_rho_x_stat = 0.5*(1.+self.zeta)*(self.rho_up+self.f_b03_up*self.rho_down)+\
+                      0.5*(1.-self.zeta)*(self.rho_down+self.f_b03_down*self.rho_up)
+        self.zeta_eff = np.sqrt(2.*ontop_rho_x_stat/self.rho_tot-1.)
+    
+    def calc_rho_eff(self):
+        plus=(1.+self.zeta_eff)/2.
+        minus=(1.-self.zeta_eff)/2.
+
+        self.rho_up_eff = plus*self.rho_tot
+        self.rho_down_eff = minus*self.rho_tot
+        #grad
+        dx_tot = (self.dx_rho_up+self.dx_rho_down)
+        self.dx_rho_up_eff = plus*dx_tot
+        self.dx_rho_down_eff = minus*dx_tot
+
+        dy_tot=(self.dy_rho_up+self.dy_rho_down)
+        self.dy_rho_up_eff = plus*dy_tot
+        self.dy_rho_down_eff = minus*dy_tot   
+
+        dz_tot=(self.dz_rho_up+self.dz_rho_down)
+        self.dz_rho_up_eff = plus*dz_tot
+        self.dz_rho_down_eff = minus*dz_tot 
+
+        #tau
+        tau_tot = (self.tau_up+self.tau_down)
+        self.tau_up_eff = plus*tau_tot
+        self.tau_down_eff = minus*tau_tot
+
     
     def calc_exc_fxc(self,gridID):
         """
@@ -186,22 +226,8 @@ class Fxc(ModelXC):
         """
 
         #for exact exchange
-        if self.br_n_up[gridID]>1.:
-            self.br_n_up[gridID]=1.
-        if self.br_n_down[gridID]>1.:
-            self.br_n_down[gridID]=1.
         norm_up=-1.#-self.br_n_up[gridID]
         norm_down=-1.#-self.br_n_down[gridID]
-        
-        if self.mol.nelectron>1:
-            self.f_b03_up = (1.-self.br_n_up[gridID])*2.
-            self.f_b03_down = (1.-self.br_n_down[gridID])*2.
-            #f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
-            #self.b_b03_up=f_b03
-            #self.f_b03_down=f_b03
-        else:
-            self.f_b03_up = 0.
-            self.f_b03_down=0.
 
         self.fx_up,self.gamma_up=self.calc_fx(norm_up,self.eps_x_exact_up[gridID],self.Q_up[gridID],self.rho_up[gridID],
                                                                 self.lap_up[gridID],self.rhoRUA[gridID])
@@ -219,29 +245,25 @@ class Fxc(ModelXC):
 
 
         self.calc_rho_x(gridID)
-        #effective zeta
-        ontop_rho_x_stat = 0.5*(1.+self.zeta[gridID])*(self.rho_up[gridID]+self.f_b03_up*self.rho_down[gridID])+\
-                      0.5*(1.-self.zeta[gridID])*(self.rho_down[gridID]+self.f_b03_down*self.rho_up[gridID])
-        effective_zeta = np.sqrt(2.*ontop_rho_x_stat/self.rho_tot[gridID]-1)
-
-        
-        ##A = self.calc_A(self.rs[gridID],self.zeta[gridID])
-        ##B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
-        #A = self.calc_A(self.rs[gridID],effective_zeta)
-        #B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]
-        ##
 #
         ##renormalize
 #
-        #gamma_avg = 0.5*(1.+self.zeta[gridID])*self.gamma_up+0.5*(1.-self.zeta[gridID])*self.gamma_down
-        #m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
-        #m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
-        #m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
-        #m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
-        #C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
+        self.cfx.calc_eps_xc_cf(gridID)
+        self.A=self.cfx.A
+        self.B=self.cfx.B*self.kf[gridID]
+        self.D=self.cfx.D*self.kf[gridID]**4
+        self.E=self.cfx.E*self.kf[gridID]**2
+        
+        m1 = np.einsum("i,i,i,i->",self.uwei,self.ux_pow[1],self.rho_x,np.exp(-self.E*self.ux_pow[2]))
+        m2 = np.einsum("i,i,i,i->",self.uwei,self.ux_pow[2],self.rho_x,np.exp(-self.E*self.ux_pow[2]))
+        m3 = np.einsum("i,i,i,i->",self.uwei,self.ux_pow[3],self.rho_x,np.exp(-self.E*self.ux_pow[2]))
+        m4 = np.einsum("i,i,i,i->",self.uwei,self.ux_pow[4],self.rho_x,np.exp(-self.E*self.ux_pow[2]))
+        m5 = np.einsum("i,i,i,i->",self.uwei,self.ux_pow[5],self.rho_x,np.exp(-self.E*self.ux_pow[2]))
+        m6 = np.einsum("i,i,i,i->",self.uwei,self.ux_pow[6],self.rho_x,np.exp(-self.E*self.ux_pow[2]))
+        self.C = (-1/(4.*np.pi)-self.A*m2-self.B*m3-self.D*m6)/m4
 
-        #self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
-        self.eps_xc_calc = self.cfx.calc_eps_xc_cf(gridID)
+        self.eps_xc_calc= 2.*np.pi*(m1*self.A+self.B*m2+self.C*m3+self.D*m5)
+        #self.eps_xc_calc = 
         return  self.eps_xc_calc*self.rho_tot[gridID]
 
 
@@ -249,9 +271,20 @@ class Fxc(ModelXC):
         """
         to calculate the total Exchange-correlation energy of the model
         """
-        sum=0
+        self.calc_zeta_eff()
+        self.calc_rho_eff()
+        self.cfx = CF(self.mol,method="cfxav_sicA",rho={"up":self.rho_up_eff,"down":self.rho_down_eff,
+                "tot":self.rho_up_eff+self.rho_down_eff},
+            grad={"up":[self.dx_rho_up_eff,self.dy_rho_up_eff,self.dz_rho_up_eff],
+            "down":[self.dx_rho_down_eff,self.dy_rho_down_eff,self.dz_rho_down_eff]},
+            tau={"up":self.tau_up_eff,"down":self.tau_down_eff},
+            eps_x_exact={"up":self.eps_x_exact_up,"down":self.eps_x_exact_down},
+            br03_params={"up":{"a":self.br_a_up,"b":self.br_b_up,"c":self.br_c_up,"n":self.br_n_up},
+            "down":{"a":self.br_a_down,"b":self.br_b_down,"c":self.br_c_down,"n":self.br_n_down}})
+        sum=0.
         for gridID in range(self.n_grid):
-            sum+=self.calc_exc_fxc(gridID)*self.weights[gridID]
+            if self.rho_tot[gridID]>1e-8:
+                sum+=self.calc_exc_fxc(gridID)*self.weights[gridID]
         self.Exc = sum
         self.E_tot_model = self.approx_E_tot-self.approx_Exc+self.Exc
         return self.E_tot_model
