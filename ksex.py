@@ -58,6 +58,7 @@ class ExKS(ModelXC):
         
         if self.mol.spin == 0: 
             ex_exact_down = ex_exact_up
+            eps_x_exact_down = eps_x_exact_up
         elif self.mol.nelectron > 1:
             for gridID in range(self.kskernel.ngrid):
                 ex_exact_down[gridID] = self.compute_ex_exact(self.kskernel.aovalues[0, gridID,:], self.kskernel.dm_down, self.kskernel.coords[gridID])
@@ -67,9 +68,8 @@ class ExKS(ModelXC):
         
     def CalculateTotalX(self, params_up=None, params_down=None):
         """
-            Function to compute the total exchange energy of a molecule with 
+        Description: Function to compute the total exchange energy with 
         exact exchange exchange KS.
-        The energies are are calculated post-approx (not self-consitent).
         """
 
         if params_up is None and params_down is None:

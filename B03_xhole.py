@@ -60,11 +60,16 @@ class B03(XHole):
         return a, b, c, n
 
     def TotalHoleSigma(self, u, a, b, c, d):
+        """
+            Input: interelectronic distance, and B03's parameters a, b and c
+            Output: the value of B03 at this position u for a given tuple of parameters
+            Description: Calculates B03 for a given spin density
+        """
         return 1.0 / (1.0 + d * u ** 4) * -c / (2.0 * a **2 * b * u) * ((a * np.abs(b - u) + 1.0) * np.exp(-a * np.abs(b - u)) - (a * np.abs(b + u) + 1.0) * np.exp(-a * np.abs(b + u)))
 
     def TotalHole(self, u, zeta, aa, ab, ac, ad, ba, bb, bc, bd):
-        print('TotalHoleSigma alpha spin: ', (0.25 * (1.0 + zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 + zeta)) ** (1.0/3.0)) * u, aa, ab, ac, ad))
-        print('TotalHoleSigma beta spin: ', (0.25 * (1.0 - zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 - zeta)) ** (1.0/3.0)) * u, ba, bb, bc, bd))
+        # print('TotalHoleSigma alpha spin: ', (0.25 * (1.0 + zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 + zeta)) ** (1.0/3.0)) * u, aa, ab, ac, ad))
+        # print('TotalHoleSigma beta spin: ', (0.25 * (1.0 - zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 - zeta)) ** (1.0/3.0)) * u, ba, bb, bc, bd))
         return (0.25 * (1.0 + zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 + zeta)) ** (1.0/3.0)) * u, aa, ab, ac, ad) + (0.25 * (1.0 - zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 - zeta)) ** (1.0/3.0)) * u, ba, bb, bc, bd)
 
     def SolveOnGrid(self):
@@ -80,6 +85,8 @@ class B03(XHole):
         self.JXB03_up = np.zeros(len(self.y_values))
         self.JXB03_down = np.zeros(len(self.y_values))
         self.JXB03 = np.zeros(self.kskernel.ngrid)
+        self.exed_up = np.zeros(self.kskernel.ngrid)
+        self.exed_down = np.zeros(self.kskernel.ngrid)
         self.exed = np.zeros(self.kskernel.ngrid)
 
         # unpack all data needed
@@ -95,11 +102,6 @@ class B03(XHole):
         eps_x_exact_up = self.kskernel.eps_x_exact_up
         eps_x_exact_down = self.kskernel.eps_x_exact_down
 
-        # Qp_up = np.zeros(self.kskernel.ngrid)
-        # rho_up2 = rho_up * rho_up
-        # Qp_up = Q_up / rho_up2 * eps_x_exact_up
-        # roots_up = self.SolveSigma1d(Q_up)
-
         aa = ab = ac = ad = 0.0
         ba = bb = bc = bd = 0.0
 
@@ -109,25 +111,35 @@ class B03(XHole):
             self.root_up[gridID] = self.SolveSigma(rho_up[gridID], Q_up[gridID], eps_x_exact_up[gridID])
             aa, ab, ac, ad = self.GetParamsSigma(rho_up[gridID], Q_up[gridID], self.root_up[gridID])
             self.JXB03_up = 2.0 * np.pi * rho_up[gridID] / (kf_up[gridID]**2) * self.TotalHoleSigma(self.y_values, aa, ab, ac, 0.0)
+            self.exed_up[gridID] = np.sum(self.y_weights * self.y_values_power[1] * self.JXB03_up) * rho_up[gridID]
 
             # Solve the beta's xhole
             if self.mol.spin == 0:
                 self.root_down[gridID] = self.root_up[gridID]
-                ba, bb, bc, bd = self.GetParamsSigma(rho_up[gridID], Q_up[gridID], self.root_up[gridID])
-                self.JXB03_down = 2.0 * np.pi * rho_down[gridID] / (kf_down[gridID]**2) * self.TotalHoleSigma(self.y_values, ba, bb, bc, 0.0)
-            elif np.all(rho_down) > 0.0 and self.mol.nelectron > 1:
+                ba, bb, bc, bd = aa, ab, ac, ad
+                self.JXB03_down = self.JXB03_up
+                self.exed_down[gridID] = self.exed_up[gridID]
+
+            elif self.mol.nelectron > 1:
                 self.root_down[gridID] = self.SolveSigma(rho_down[gridID], Q_down[gridID], eps_x_exact_down[gridID])
                 ba, bb, bc, bd = self.GetParamsSigma(rho_down[gridID], Q_down[gridID], self.root_down[gridID])
                 self.JXB03_down = 2.0 * np.pi * rho_down[gridID] / (kf_down[gridID]**2) * self.TotalHoleSigma(self.y_values, ba, bb, bc, 0.0)
+                self.exed_down[gridID] = np.sum(self.y_weights * self.y_values_power[1] * self.JXB03_down) * rho_down[gridID]
 
             # calculate total JX
             self.JXB03 = (0.25 * (1.0 + zeta[gridID]) ** 2) * self.JXB03_up + (0.25 * (1.0 - zeta[gridID]) ** 2) * self.JXB03_down
 
             # exchange energy density
-            self.exed[gridID] = np.sum(self.y_weights * self.y_values_power[1] * self.JXB03)
+            # self.exed[gridID] = np.sum(self.y_weights * self.y_values_power[1] * self.JXB03)
+            
+            self.exed[gridID] = self.exed_up[gridID] + self.exed_down[gridID]
 
         return
 
     def CalculateTotalX(self):
+        """
+        Description: Function to compute the total exchange energy with exact exchange exchange KS.        
+        """
         self.SolveOnGrid()
-        return np.sum(self.kskernel.weights * self.kskernel.rho * self.exed)
+        # return np.sum(self.kskernel.weights * self.kskernel.rho * self.exed)
+        return np.sum(self.kskernel.weights * self.exed)
