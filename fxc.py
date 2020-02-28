@@ -192,7 +192,10 @@ class Fxc(ModelXC):
         ontop_rho_x_stat = 0.5*(1.+self.zeta)*(self.rho_up+self.f_b03_up*self.rho_down)+\
                       0.5*(1.-self.zeta)*(self.rho_down+self.f_b03_down*self.rho_up)
         self.zeta_eff = np.sqrt(2.*ontop_rho_x_stat/self.rho_tot-1.)
-    
+        self.zeta_eff[self.zeta_eff>1.]=1.
+
+
+        
     def calc_rho_eff(self):
         plus=(1.+self.zeta_eff)/2.
         minus=(1.-self.zeta_eff)/2.
@@ -273,7 +276,7 @@ class Fxc(ModelXC):
         """
         self.calc_zeta_eff()
         self.calc_rho_eff()
-        self.cfx = CF(self.mol,method="cfxav_sicA",rho={"up":self.rho_up_eff,"down":self.rho_down_eff,
+        self.cfx = CF(self.mol,method="cfxav_sic1",rho={"up":self.rho_up_eff,"down":self.rho_down_eff,
                 "tot":self.rho_up_eff+self.rho_down_eff},
             grad={"up":[self.dx_rho_up_eff,self.dy_rho_up_eff,self.dz_rho_up_eff],
             "down":[self.dx_rho_down_eff,self.dy_rho_down_eff,self.dz_rho_down_eff]},

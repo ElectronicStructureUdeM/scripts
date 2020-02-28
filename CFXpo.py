@@ -247,7 +247,8 @@ class CF:
         """
         self.A = self.calc_A(self.rs[gridID],self.zeta[gridID])
         self.B = self.calc_B(self.rs[gridID],self.zeta[gridID])
-        if self.method=="cfx" or self.method=="cfxn" or self.method=="cfxav" or self.method=="cfxav_sicA":
+        if self.method=="cfx" or self.method=="cfxn" or self.method=="cfxav" or self.method=="cfxav_sicA" or\
+            self.method=="cfxav_sic1":
          # for jx lsd
          self.JX_LSD = self.calc_jx_approx(gridID,self.eps_x_LSD_up[gridID],self.eps_x_LSD_down[gridID])
          # for fc lsd
@@ -266,7 +267,8 @@ class CF:
             self.JX_Exact = self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
                                                   self.eps_x_exact_down[gridID])
         # for cfxn end
-        elif self.method=="cfx" or self.method=="cf3" or self.method=="cfxav" or self.method=="cfxav_sicA":
+        elif self.method=="cfx" or self.method=="cf3" or self.method=="cfxav" or self.method=="cfxav_sicA" or\
+            self.method=="cfxav_sic1":
             #for cfx begin
             kfa = (3.0*(np.pi**2.0) *self.rho_up[gridID])**(1.0/3.0)
             kfb = (3.0*(np.pi**2.0) *self.rho_down[gridID])**(1.0/3.0)
@@ -286,11 +288,13 @@ class CF:
                                             br03_b_up,br03_c_up,0.,
                                             br03_a_down,br03_b_down,
                                             br03_c_down,0)
-            if self.method=="cfxav" or self.method=="cfxav_sicA":
+            if self.method=="cfxav" or self.method=="cfxav_sicA" or self.method=="cfxav_sic1":
                 if self.method=="cfxav":
                     self.lambd = 0.225
                 elif self.method=="cfxav_sicA":
                     self.lambd=0.201
+                elif self.method=="cfxav_sic1":
+                    self.lambd=0.286
                 self.JX_Exact = self.lambd*self.calc_jx_approx(gridID,self.eps_x_exact_up[gridID],
                                                   self.eps_x_exact_down[gridID])
                 self.JX_Exact = self.JX_Exact + (1.0-self.lambd)*brholedtot(self.y_values,self.zeta[gridID],br03_a_up,
@@ -305,6 +309,10 @@ class CF:
                 self.sicA = self.a_avg+self.b_sic*self.zeta[gridID]**2*self.tauratio[gridID]**2
                 self.D=self.D*(1.-self.sicA)
                 self.E=self.E*(1.-self.sicA)
+            elif self.method=="cfxav_sic1":
+                self.sic1 = self.zeta[gridID]**2*self.tauratio[gridID]**2
+                self.D=self.D*(1.-self.sic1)
+                self.E=self.E*(1.-self.sic1)
             #for cfx end
         else:
             print(self.method)

@@ -27,7 +27,7 @@ def brholed(u,a,b,c,d):
         return np.zeros(np.shape(u)[0])
 
 def brholedtot(u,zeta,aa,ab,ac,ad,ba,bb,bc,bd):
-    if zeta>1.:
+    if zeta>1:
         zeta=1.
     return (0.25*(1+zeta)**2)*brholed(((0.5*(1+zeta))**(1.0/3.0))*u,aa,ab,ac,ad) + (0.25*(1-zeta)**2)*brholed(((0.5*(1-zeta))**(1.0/3.0))*u,ba,bb,bc,bd)
 
