@@ -47,25 +47,24 @@ class Fxc(ModelXC):
         """
         return np.exp(-gamma*u2)*(-1.+alpha*u2)+(beta*u4+xi*u6)*np.exp(-gamma*(u1-umax)**2)
 
-    def find_gamma(self,gamma,norm,rhoRU):
+    def find_gamma(self,gamma,eps_x,rhoRU):
         """
-        Target function to find gamma by normalising the exchange hole,
+        Target function to find gamma by reproducing exact exchange,
         with all the other parameters set to 0.
         Input:
             gamma:parameter
-            norm: float
-                desired normalisation
+            eps_x: float
+                epsilon_x to reproduce
 
             rhoru: array of float
                 all the rho(r,u) for a r
         return:
             array with:
-               int_0^maxu 4*pi*u**2*rho(r,u)*fx4 du - norm
+               int_0^maxu 2*pi*u*rho(r,u)*fx4 du - eps_x
 
         """
         fx4 = self.calc_fx4(0.,0.,0.,gamma,0.,self.ux_pow[2],0.,0.,0.)
-        #print(gamma, 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx4*rhoRU),norm)
-        return 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx4*rhoRU)-norm
+        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx4*rhoRU)-eps_x
 
 
     def calc_fx(self,norm,epsilonX,Q,rhoR,lap,rhoRU):
@@ -87,7 +86,7 @@ class Fxc(ModelXC):
                 the exchange factor for each u
         """
         #gamma
-        gamma= scipy.optimize.brentq(self.find_gamma,-1e-1,1000,args=(norm,rhoRU))
+        gamma= scipy.optimize.brentq(self.find_gamma,-1e-1,1000,args=(epsilonX,rhoRU))
         #alpha
         alpha = (-Q+(1./6.)*lap)/(2.*rhoR)-gamma
         #beta
@@ -186,8 +185,12 @@ class Fxc(ModelXC):
         norm_down=-1.#-self.br_n_down[gridID]
         
         if self.mol.nelectron>1:
-            self.f_b03_up = (1.-self.br_n_up[gridID])*2.
-            self.f_b03_down = (1.-self.br_n_down[gridID])*2.
+            self.f_b03_up = (1.-self.br_n_up[gridID])*2
+            self.f_b03_down = (1.-self.br_n_down[gridID])*2
+            if self.f_b03_up>1.:
+                self.f_b03_up=1.
+            if self.f_b03_down>1.:
+                self.f_b03_down=1.
             #f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
             #self.b_b03_up=f_b03
             #self.f_b03_down=f_b03
@@ -220,14 +223,7 @@ class Fxc(ModelXC):
         #B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
         A = self.calc_A(self.rs[gridID],effective_zeta)
         B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]
-        #
-        if self.mol.nelectron>1:
-            z_length = -(1./self.eps_x_exact_up[gridID]+1./self.eps_x_exact_down[gridID])
-        else:
-            z_length = -1./self.eps_x_exact_up[gridID]
-        #renormalize
 
-        gamma_avg = 0.5*(1.+self.zeta[gridID])*self.gamma_up+0.5*(1.-self.zeta[gridID])*self.gamma_down
         m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
         m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
         m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
@@ -235,14 +231,6 @@ class Fxc(ModelXC):
         C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
 
         self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
-        if self.eps_xc_calc<-5.:
-            plt.scatter(self.ux,self.rho_x*(A+B*self.ux+C*self.ux_pow[2]),label="rhoxc")
-            plt.scatter(self.ux,self.rho_x,label="rhox")
-            plt.scatter(self.ux,-self.rhoRUA[gridID]*2.,label="-rho(r,u)")
-            plt.xlabel("u")
-            plt.legend()
-            plt.show()
-            self.eps_xc_calc=-1
         return  self.eps_xc_calc*self.rho_tot[gridID]
 
 
