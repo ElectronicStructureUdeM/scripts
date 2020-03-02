@@ -101,10 +101,6 @@ def brxnparam(rhot,epsx):
      b = 0.0 
      c =0.0
      d = 0.0 
-
-
-      
-
     kf = (3.0*rhot*np.pi**2.0)**(1.0/3.0)
     #if (a<0 or b<0):
     #    exit("a or b<0 %.2f %.2f %.2f %.2f"%(epsx,rhot,a/kf,b))
