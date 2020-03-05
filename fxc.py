@@ -48,25 +48,23 @@ class Fxc(ModelXC):
         """
         return np.exp(-gamma*u2)*(-1.+alpha*u2)+(beta*u4+xi*u6)*np.exp(-gamma*(u1-umax)**2)
 
-    def find_gamma(self,gamma,norm,rhoRU):
+    def find_gamma(self,gamma,epsilonX,rhoRU):
         """
-        Target function to find gamma by normalising the exchange hole,
-        with all the other parameters set to 0.
-        Input:
+        Target function to find gamma by reproducing exact exchange
             gamma:parameter
-            norm: float
-                desired normalisation
+            epsilonX: float
+                exchange energy density
 
             rhoru: array of float
                 all the rho(r,u) for a r
         return:
             array with:
-               int_0^maxu 4*pi*u**2*rho(r,u)*fx4 du - norm
+               int_0^maxu 2*pi*u*rho(r,u)*fx4 du - norm
 
         """
         fx4 = self.calc_fx4(0.,0.,0.,gamma,0.,self.ux_pow[2],0.,0.,0.)
         #print(gamma, 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx4*rhoRU),norm)
-        return 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx4*rhoRU)-norm
+        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx4*rhoRU)-epsilonX
 
 
     def calc_fx(self,norm,epsilonX,Q,rhoR,lap,rhoRU):
@@ -88,7 +86,7 @@ class Fxc(ModelXC):
                 the exchange factor for each u
         """
         #gamma
-        gamma= scipy.optimize.brentq(self.find_gamma,-1e-1,1000,args=(norm,rhoRU))
+        gamma= scipy.optimize.brentq(self.find_gamma,-1e-1,1000,args=(epsilonX,rhoRU))
         #alpha
         alpha = (-Q+(1./6.)*lap)/(2.*rhoR)-gamma
         #beta
@@ -276,7 +274,7 @@ class Fxc(ModelXC):
         """
         self.calc_zeta_eff()
         self.calc_rho_eff()
-        self.cfx = CF(self.mol,method="cfxav_sic1",rho={"up":self.rho_up_eff,"down":self.rho_down_eff,
+        self.cfx = CF(self.mol,method="cfxav_sicA",rho={"up":self.rho_up_eff,"down":self.rho_down_eff,
                 "tot":self.rho_up_eff+self.rho_down_eff},
             grad={"up":[self.dx_rho_up_eff,self.dy_rho_up_eff,self.dz_rho_up_eff],
             "down":[self.dx_rho_down_eff,self.dy_rho_down_eff,self.dz_rho_down_eff]},
