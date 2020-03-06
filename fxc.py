@@ -47,14 +47,14 @@ class Fxc(ModelXC):
         """
         return np.exp(-gamma*u2)*(-1.+alpha*u2)+(beta*u4+xi*u6)*np.exp(-gamma*(u1-umax)**2)
 
-    def find_gamma(self,gamma,eps_x,rhoRU):
+    def find_gamma(self,gamma,norm,rhoRU):
         """
-        Target function to find gamma by reproducing exact exchange,
+        Target function to find gamma by normalizing,
         with all the other parameters set to 0.
         Input:
             gamma:parameter
-            eps_x: float
-                epsilon_x to reproduce
+            norm: float
+                desired normalisation
 
             rhoru: array of float
                 all the rho(r,u) for a r
@@ -64,7 +64,7 @@ class Fxc(ModelXC):
 
         """
         fx4 = self.calc_fx4(0.,0.,0.,gamma,0.,self.ux_pow[2],0.,0.,0.)
-        return 2.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[1],fx4*rhoRU)-eps_x
+        return 4.*np.pi*np.einsum("i,i,i->",self.uwei,self.ux_pow[2],fx4*rhoRU)-norm
 
 
     def calc_fx(self,norm,epsilonX,Q,rhoR,lap,rhoRU):
@@ -86,7 +86,7 @@ class Fxc(ModelXC):
                 the exchange factor for each u
         """
         #gamma
-        gamma= scipy.optimize.brentq(self.find_gamma,-1e-1,1000,args=(epsilonX,rhoRU))
+        gamma= scipy.optimize.brentq(self.find_gamma,-1e-1,1000,args=(norm,rhoRU))
         #alpha
         alpha = (-Q+(1./6.)*lap)/(2.*rhoR)-gamma
         #beta
@@ -185,8 +185,8 @@ class Fxc(ModelXC):
         norm_down=-1.#-self.br_n_down[gridID]
         
         if self.mol.nelectron>1:
-            self.f_b03_up = (1.-self.br_n_up[gridID])*2
-            self.f_b03_down = (1.-self.br_n_down[gridID])*2
+            self.f_b03_up = (1.-self.br_n_up[gridID])*3
+            self.f_b03_down = (1.-self.br_n_down[gridID])*3
             if self.f_b03_up>1.:
                 self.f_b03_up=1.
             if self.f_b03_down>1.:
