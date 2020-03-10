@@ -185,15 +185,11 @@ class Fxc(ModelXC):
         norm_down=-1.#-self.br_n_down[gridID]
         
         if self.mol.nelectron>1:
-            self.f_b03_up = (1.-self.br_n_up[gridID])*3
-            self.f_b03_down = (1.-self.br_n_down[gridID])*3
-            if self.f_b03_up>1.:
-                self.f_b03_up=1.
-            if self.f_b03_down>1.:
-                self.f_b03_down=1.
-            #f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
-            #self.b_b03_up=f_b03
-            #self.f_b03_down=f_b03
+            self.f_b03_up = 0.#YO(1.-self.br_n_up[gridID])/self.br_n_down[gridID]
+            self.f_b03_down = 0.#YO(1.-self.br_n_down[gridID])/self.br_n_up[gridID]
+            f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
+            self.b_b03_up=f_b03
+            self.f_b03_down=f_b03
         else:
             self.f_b03_up = 0.
             self.f_b03_down=0.
@@ -224,6 +220,7 @@ class Fxc(ModelXC):
         A = self.calc_A(self.rs[gridID],effective_zeta)
         B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]
 
+        
         m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
         m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
         m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
