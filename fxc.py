@@ -185,11 +185,11 @@ class Fxc(ModelXC):
         norm_down=-1.#-self.br_n_down[gridID]
         
         if self.mol.nelectron>1:
-            self.f_b03_up = 0.#YO(1.-self.br_n_up[gridID])/self.br_n_down[gridID]
-            self.f_b03_down = 0.#YO(1.-self.br_n_down[gridID])/self.br_n_up[gridID]
-            f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
-            self.b_b03_up=f_b03
-            self.f_b03_down=f_b03
+            self.f_b03_up = (1.-self.br_n_up[gridID])*2#/self.br_n_down[gridID]
+            self.f_b03_down = (1.-self.br_n_down[gridID])*2#/self.br_n_up[gridID]
+            #f_b03 = np.min([self.f_b03_up,self.f_b03_down,1.])
+            #self.b_b03_up=f_b03
+            #self.f_b03_down=f_b03
         else:
             self.f_b03_up = 0.
             self.f_b03_down=0.
@@ -218,16 +218,16 @@ class Fxc(ModelXC):
         #A = self.calc_A(self.rs[gridID],self.zeta[gridID])
         #B = self.calc_B(self.rs[gridID],self.zeta[gridID])*self.kf[gridID] # because we have a function of u and not y
         A = self.calc_A(self.rs[gridID],effective_zeta)
-        B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]
+        B = self.calc_B(self.rs[gridID],effective_zeta)*self.kf[gridID]/-A
 
         
-        m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x)
-        m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x)
-        m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x)
-        m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x)
-        C = (-1/(4.*np.pi)-A*m2-B*m3)/m4
+        m1 = np.einsum("i,i,i->",self.uwei,self.ux_pow[1],self.rho_x*np.exp(-B*self.ux_pow[1]))
+        m2 = np.einsum("i,i,i->",self.uwei,self.ux_pow[2],self.rho_x*np.exp(-B*self.ux_pow[1]))
+        m3 = np.einsum("i,i,i->",self.uwei,self.ux_pow[3],self.rho_x*np.exp(-B*self.ux_pow[1]))
+        m4 = np.einsum("i,i,i->",self.uwei,self.ux_pow[4],self.rho_x*np.exp(-B*self.ux_pow[1]))
+        C = (-1/(4.*np.pi)-A*m2)/m4
 
-        self.eps_xc_calc= 2.*np.pi*(m1*A+B*m2+C*m3)
+        self.eps_xc_calc= 2.*np.pi*(m1*A+C*m3)
         return  self.eps_xc_calc*self.rho_tot[gridID]
 
 
