@@ -18,7 +18,7 @@ class XHole():
                               4:self.y_values**4, 5:self.y_values**5, 6:self.y_values**6}
 
     @property
-    def SolveSigma(self):
+    def SolveSigma(self, rho, eps_x_exact):
         return NotImplementedError('Subclass specialization')
 
     @property

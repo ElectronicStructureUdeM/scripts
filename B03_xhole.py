@@ -132,6 +132,48 @@ class B03(XHole):
 
         return
 
+    def CalculateJX(self, rho_up, rho_down, Q_up, Q_down, eps_x_exact_up, eps_x_exact_down):
+        """
+            Input: rho, Q and energy densities
+            Output: solutions of the up and down spin xholes
+            Description: The function solves the B03 for each spin coordinate in the grid, 
+            stores the solutions in the object's and returns the solutions
+        """
+        rho = rho_up + rho_down
+        zeta = (rho_up - rho_down) / rho
+        kf_up = (3. * np.pi**2 * rho_up)**(1. / 3.)
+        kf_down = (3. * np.pi**2 * rho_down)**(1. / 3.)
+
+        JXB03_up = 0.0
+        JXB03_down = 0.0
+        JXB03 = 0.0
+        aa = ab = ac = ad = 0.0
+        ba = bb = bc = bd = 0.0
+
+        # Solve the alpha's xhole
+        root_up = self.SolveSigma(rho_up, Q_up, eps_x_exact_up)
+        aa, ab, ac, ad = self.GetParamsSigma(rho_up, Q_up, root_up)
+        JXB03_up = 2.0 * np.pi * rho_up / (kf_up[gridID]**2) * self.TotalHoleSigma(self.y_values, aa, ab, ac, 0.0)
+
+        # Solve the beta's xhole
+        if self.mol.spin == 0:
+            root_down = root_up
+            ba, bb, bc, bd = aa, ab, ac, ad
+            JXB03_down = self.JXB03_up
+
+        elif self.mol.nelectron > 1:
+            root_down = self.SolveSigma(rho_down, Q_down, eps_x_exact_down)
+            ba, bb, bc, bd = self.GetParamsSigma(rho_down, Q_down, root_down)
+            JXB03_down = 2.0 * np.pi * rho_down / (kf_down[gridID]**2) * self.TotalHoleSigma(self.y_values, ba, bb, bc, 0.0)
+
+        # calculate total JX
+        JXB03 = (0.25 * (1.0 + zeta) ** 2) * self.JXB03_up + (0.25 * (1.0 - zeta) ** 2) * self.JXB03_down
+
+        # exchange energy density
+        # self.exed[gridID] = np.sum(self.y_weights * self.y_values_power[1] * self.JXB03)
+    
+        return JXB03
+
     def CalculateTotalX(self):
         """
         Description: Function to compute the total exchange energy with exact exchange exchange KS.        

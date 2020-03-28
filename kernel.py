@@ -141,8 +141,8 @@ class KSKernel:
         self.rs = (3. / (4. * np.pi * self.rho))**(1. / 3.)
 
         # future storage the exact exchange
-        eps_x_exact_up = np.zeros(self.ngrid)
-        eps_x_exact_down = np.zeros(self.ngrid)
+        exact_eps_x_up = np.zeros(self.ngrid)
+        exact_eps_x_down = np.zeros(self.ngrid)
 
 
     def GetDM(self):

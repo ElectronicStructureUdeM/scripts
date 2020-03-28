@@ -37,7 +37,6 @@ class DFA(ModelXC):
         eps_x_up, vx_up = dft.libxc.eval_xc(self.exchange_functional + ",", [params_up, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
         if self.mol.spin == 0: 
             eps_x_down = eps_x_up
-            vx_down = vx_up
         elif self.mol.nelectron > 1:
             eps_x_down, vx_down = dft.libxc.eval_xc(self.exchange_functional + ",", [params_down, [zeros, zeros, zeros, zeros, zeros, zeros]], spin=5)[:2]
         
@@ -61,9 +60,9 @@ class DFA(ModelXC):
         #here spin is defined as greater than one so we can exact up and down energies densites
         zeros = np.zeros(self.ngridpoints) # also used so we can exact up and down energies densites
         
-        eps_x_up, vx_up, eps_x_down, vx_down = self.CalculateEpsilonX(params_up, params_down)
+        eps_x_up, eps_x_down = self.CalculateEpsilonX(params_up, params_down)
 
-        eps_c,vc = self.CalculateEpsilonC(params_up, params_down)
+        eps_c = self.CalculateEpsilonC(params_up, params_down)
 
         return eps_x_up, eps_x_down, eps_c
 

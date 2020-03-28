@@ -155,6 +155,40 @@ class BRN(XHole):
 
         return
 
+    def CalculateJX(self, rho_up, rho_down, eps_x_exact_up, eps_x_exact_down):
+
+        rho = rho_up + rho_down
+        zeta = (rho_up - rho_down) / rho
+        kf_up = (3. * np.pi**2 * rho_up)**(1. / 3.)
+        kf_down = (3. * np.pi**2 * rho_down)**(1. / 3.)
+
+        JXBRN_up = 0.0
+        JXBRN_down = 0.0
+        JXBRN = 0.0
+        aa = ab = ac = ad = 0.0
+        ba = bb = bc = bd = 0.0
+        
+        # Solve the alpha's xhole
+        root_up = self.SolveSigma(rho_up, eps_x_exact_up)
+        aa, ab, ac, ad = self.GetParamsSigma(rho_up, root_up)
+        JXBRN_up = 2.0 * np.pi * rho_up / (kf_up ** 2) * self.TotalHoleSigma(self.y_values, aa, ab, ac, ad)
+
+        # Solve the beta's xhole
+        if self.mol.spin == 0:
+            rho_down = root_up
+            ba, bb, bc, bd = aa, ab, ac, ad
+            self.JXBRN_down = self.JXBRN_up
+
+        elif self.mol.nelectron > 1:
+            root_down = self.SolveSigma(rho_down, eps_x_exact_down)
+            ba, bb, bc, bd = self.GetParamsSigma(rho_down, root_down)
+            JXBRN_down = 2.0 * np.pi * rho_down / (kf_down ** 2) * self.TotalHoleSigma(self.y_values, ba, bb, bc, bd)
+
+        # calculate total JX
+        JXBRN = (0.25 * (1.0 + zeta) ** 2) * JXBRN_up + (0.25 * (1.0 - zeta) ** 2) * JXBRN_down
+
+        return JXBRN
+
     def CalculateTotalX(self):
         """
         Description: Function to compute the total exchange energy with exact exchange exchange KS.
