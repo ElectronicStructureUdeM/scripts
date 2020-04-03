@@ -87,12 +87,12 @@ def brxcparam(rhot,epsxc):
     return a,b 
 
 def brxnparam(rhot,epsx):
-  
+    
     alim = 2.0/((3.0*np.pi)**(1.0/3.0))
 
     sol = scipy.optimize.root_scalar(findabrxc, args=(rhot,epsx), xtol=1e-10, bracket=[1e-8,1000] , method='brentq')
-
-    a = sol.root 
+    # print('*********************************: ', sol.root)
+    a = sol.root
     if a !=0.0:
      b = -np.log(rhot*8*np.pi/(a**3))/a
      c = (a**3.0)/(8.0*np.pi)
@@ -105,12 +105,12 @@ def brxnparam(rhot,epsx):
     #if (a<0 or b<0):
     #    exit("a or b<0 %.2f %.2f %.2f %.2f"%(epsx,rhot,a/kf,b))
     if a/kf <= alim:
-      #print('finddbrn',a/kf)
+      print('finddbrn',a/kf)
       a = 0.96*kf
       b = -np.log(rhot*8*np.pi/(a**3))/a
       c = (a**3.0)/(8.0*np.pi)
       sold = scipy.optimize.root_scalar(finddbrxn, args=(rhot,epsx), bracket=[0,1000] , method='brentq')
       d = sold.root
-
+    
     return a,b,c,d 
 

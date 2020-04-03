@@ -21,8 +21,11 @@ class B03(XHole):
         Input: x is the value given by the rootfind method, rho and eps_x_exact are the density and the exchange energy per particle
         for a given spin at a given point
         Ouput: value of the equation
-        """        
-        return (x - 2.0) / (x * x) * (np.exp(x) - 1.0 - x / 2.0) - (-3.0 / (2.0 * np.pi) * Qp)
+        """
+        lhs = (x-2)/(x**2) * (np.exp(x) -1 - x/2)
+        rhs = -3/(2* np.pi) * Qp
+        return lhs-rhs
+        # return (x - 2.0) / (x * x) * (np.exp(x) - 1.0 - x / 2.0) - (-3.0 / (2.0 * np.pi) * Qp)
 
     def SolveSigma(self, rho, Q, eps_x_exact):
         """
@@ -33,7 +36,7 @@ class B03(XHole):
 
         rho2 = rho * rho
         Qp = Q / rho2 * eps_x_exact
-        solobj = scipy.optimize.root_scalar(self.EquationX, args=(Qp), xtol=1e-10, bracket=[1e-8,1000] , method='brentq')
+        solobj = scipy.optimize.root_scalar(self.EquationX, args=(Qp), xtol=1e-10, bracket=[1e-10,1000] , method='brentq')
         root = solobj.root
 
         return root
@@ -57,16 +60,22 @@ class B03(XHole):
 
     def TotalHoleSigma(self, u, a, b, c, d):
         """
-            Input: interelectronic distance, and B03's parameters a, b and c
-            Output: the value of B03 at this position u for a given tuple of parameters
-            Description: Calculates B03 for a given spin density
+            Input: interelectronic distance, and BRN's parameters a, b and c
+            Output: the value of BRN at this position u for a given tuple of parameters
+            Description: Calculates BRN for a given spin density
         """
-        return 1.0 / (1.0 + d * u ** 4) * -c / (2.0 * a **2 * b * u) * ((a * np.abs(b - u) + 1.0) * np.exp(-a * np.abs(b - u)) - (a * np.abs(b + u) + 1.0) * np.exp(-a * np.abs(b + u)))
-
+        # return 1.0 / (1.0 + d * u ** 4) * -c / (2.0 * a **2 * b * u) * ((a * np.abs(b - u) + 1.0) * np.exp(-a * np.abs(b - u)) - (a * np.abs(b + u) + 1.0) * np.exp(-a * np.abs(b + u)))
+        np.seterr(invalid='raise')
+        try:
+            return 1/(1+d*u**4) * -c/(2*a**2*b*u)* ((a*np.abs(b-u)+1)*np.exp(-a*np.abs(b-u)) - (a*np.abs(b+u)+1)*np.exp(-a*np.abs(b+u)))
+        except FloatingPointError:#a, b,c or u are zeros, zeros are returned
+            return np.zeros(np.shape(u)[0])        
+        
     def TotalHole(self, u, zeta, aa, ab, ac, ad, ba, bb, bc, bd):
         # print('TotalHoleSigma alpha spin: ', (0.25 * (1.0 + zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 + zeta)) ** (1.0/3.0)) * u, aa, ab, ac, ad))
         # print('TotalHoleSigma beta spin: ', (0.25 * (1.0 - zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 - zeta)) ** (1.0/3.0)) * u, ba, bb, bc, bd))
-        return (0.25 * (1.0 + zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 + zeta)) ** (1.0/3.0)) * u, aa, ab, ac, ad) + (0.25 * (1.0 - zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 - zeta)) ** (1.0/3.0)) * u, ba, bb, bc, bd)
+        # return (0.25 * (1.0 + zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 + zeta)) ** (1.0/3.0)) * u, aa, ab, ac, ad) + (0.25 * (1.0 - zeta) ** 2) * self.TotalHoleSigma(((0.5 * (1.0 - zeta)) ** (1.0/3.0)) * u, ba, bb, bc, bd)
+        return (0.25*(1+zeta)**2)*self.TotalHoleSigma(((0.5*(1+zeta))**(1.0/3.0))*u,aa,ab,ac,ad) + (0.25*(1-zeta)**2)*self.TotalHoleSigma(((0.5*(1-zeta))**(1.0/3.0))*u,ba,bb,bc,bd)
 
     def SolveOnGrid(self):
         """
@@ -94,9 +103,9 @@ class B03(XHole):
         kf_up = (3. * np.pi**2 * rho_up)**(1. / 3.)
         kf_down = (3. * np.pi**2 * rho_down)**(1. / 3.)
         Q_up = self.kskernel.Q_up
-        Q_down = self.kskernel.Q_up
-        eps_x_exact_up = self.kskernel.eps_x_exact_up
-        eps_x_exact_down = self.kskernel.eps_x_exact_down
+        Q_down = self.kskernel.Q_down
+        eps_x_exact_up = self.kskernel.exact_eps_x_up
+        eps_x_exact_down = self.kskernel.exact_eps_x_down
 
         aa = ab = ac = ad = 0.0
         ba = bb = bc = bd = 0.0
@@ -116,7 +125,8 @@ class B03(XHole):
                 self.JXB03_down = self.JXB03_up
                 self.exed_down[gridID] = self.exed_up[gridID]
 
-            elif self.mol.nelectron > 1:
+            # elif self.mol.nelectron > 1:
+            elif self.mol.spin > 0 and self.mol.nelectron > 1:                
                 self.root_down[gridID] = self.SolveSigma(rho_down[gridID], Q_down[gridID], eps_x_exact_down[gridID])
                 ba, bb, bc, bd = self.GetParamsSigma(rho_down[gridID], Q_down[gridID], self.root_down[gridID])
                 self.JXB03_down = 2.0 * np.pi * rho_down[gridID] / (kf_down[gridID]**2) * self.TotalHoleSigma(self.y_values, ba, bb, bc, 0.0)
@@ -133,12 +143,7 @@ class B03(XHole):
         return
 
     def CalculateJX(self, rho_up, rho_down, Q_up, Q_down, eps_x_exact_up, eps_x_exact_down):
-        """
-            Input: rho, Q and energy densities
-            Output: solutions of the up and down spin xholes
-            Description: The function solves the B03 for each spin coordinate in the grid, 
-            stores the solutions in the object's and returns the solutions
-        """
+
         rho = rho_up + rho_down
         zeta = (rho_up - rho_down) / rho
         kf_up = (3. * np.pi**2 * rho_up)**(1. / 3.)
@@ -151,23 +156,30 @@ class B03(XHole):
         ba = bb = bc = bd = 0.0
 
         # Solve the alpha's xhole
-        root_up = self.SolveSigma(rho_up, Q_up, eps_x_exact_up)
-        aa, ab, ac, ad = self.GetParamsSigma(rho_up, Q_up, root_up)
-        JXB03_up = 2.0 * np.pi * rho_up / (kf_up[gridID]**2) * self.TotalHoleSigma(self.y_values, aa, ab, ac, 0.0)
+        if rho_up > 1.0e-8:
+            root_up = self.SolveSigma(rho_up, Q_up, eps_x_exact_up)
+            aa, ab, ac, ad = self.GetParamsSigma(rho_up, Q_up, root_up)
+            # used to calculate the energy density
+            # JXB03_up = 2.0 * np.pi * rho_up / (kf_up ** 2) * self.TotalHoleSigma(self.y_values, aa, ab, ac, 0.0)
+            JXB03_up = self.TotalHoleSigma(self.y_values, aa, ab, ac, 0.0)
 
         # Solve the beta's xhole
         if self.mol.spin == 0:
             root_down = root_up
             ba, bb, bc, bd = aa, ab, ac, ad
-            JXB03_down = self.JXB03_up
+            JXB03_down = JXB03_up
 
-        elif self.mol.nelectron > 1:
-            root_down = self.SolveSigma(rho_down, Q_down, eps_x_exact_down)
-            ba, bb, bc, bd = self.GetParamsSigma(rho_down, Q_down, root_down)
-            JXB03_down = 2.0 * np.pi * rho_down / (kf_down[gridID]**2) * self.TotalHoleSigma(self.y_values, ba, bb, bc, 0.0)
+        elif self.mol.spin > 0 and self.mol.nelectron > 1:
+            if rho_down > 1.0e-8:
+                root_down = self.SolveSigma(rho_down, Q_down, eps_x_exact_down)
+                ba, bb, bc, bd = self.GetParamsSigma(rho_down, Q_down, root_down)
+                # used to calculate the energy density
+                # JXB03_down = 2.0 * np.pi * rho_down / (kf_down ** 2) * self.TotalHoleSigma(self.y_values, ba, bb, bc, 0.0)
+                JXB03_down = self.TotalHoleSigma(self.y_values, ba, bb, bc, 0.0)
 
         # calculate total JX
-        JXB03 = (0.25 * (1.0 + zeta) ** 2) * self.JXB03_up + (0.25 * (1.0 - zeta) ** 2) * self.JXB03_down
+        # JXB03 = (0.25 * (1.0 + zeta) ** 2) * JXB03_up + (0.25 * (1.0 - zeta) ** 2) * JXB03_down
+        JXB03 = self.TotalHole(self.y_values, zeta, aa, ab, ac, ad, ba, bb, bc, bd)
 
         # exchange energy density
         # self.exed[gridID] = np.sum(self.y_weights * self.y_values_power[1] * self.JXB03)
