@@ -189,10 +189,10 @@ class BRN(XHole):
         kf_down = (3. * np.pi**2 * rho_down)**(1. / 3.)
 
         JXBRN_up = 0.0
-        root_up = 0.0
-        root_down = 0.0
         JXBRN_down = 0.0
         JXBRN = 0.0
+        root_up = 0.0
+        root_down = 0.0        
         aa = ab = ac = ad = 0.0
         ba = bb = bc = bd = 0.0
         

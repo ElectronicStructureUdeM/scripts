@@ -34,9 +34,9 @@ class B03(XHole):
             Description: Finds the root of the equation XXX developed in ref XXX for a given spin coordinate
         """
 
-        rho2 = rho * rho
+        rho2 = rho**2
         Qp = Q / rho2 * eps_x_exact
-        solobj = scipy.optimize.root_scalar(self.EquationX, args=(Qp), xtol=1e-10, bracket=[1e-10,1000] , method='brentq')
+        solobj = scipy.optimize.root_scalar(self.EquationX, args=(Qp), xtol=1e-10, bracket=[1e-8,1000] , method='brentq')
         root = solobj.root
 
         return root
@@ -48,14 +48,25 @@ class B03(XHole):
             Description: With a given solution of the exchange hole model the function obtains its parameters
         """
 
-        a = np.sqrt(6.0 * Q / rho * root / (root - 2.0))
-        b = root / a
-        c = rho * np.exp(root)
-        n = 8.0 * np.pi * c / (a ** 3)        
-        kf = (3.0 * (np.pi * np.pi) * rho) ** (1.0/3.0)
+        # a = np.sqrt(6.0 * Q / rho * root / (root - 2.0))
+        # b = root / a
+        # c = rho * np.exp(root)
+        # n = 8.0 * np.pi * c / (a ** 3)        
+
+        
+
+
+        a = 6*Q/rho * root/(root-2)
+        a = np.sqrt(a)
+        b = root/a
+        c = rho*np.exp(root)
+        n = 8*np.pi*c/(a**3)
+
+        kf = (3.0 * (np.pi**2 ) * rho) ** (1.0/3.0)
         a = a / kf
         b = b * kf
         c = c / rho
+
         return a, b, c, n
 
     def TotalHoleSigma(self, u, a, b, c, d):
@@ -152,11 +163,13 @@ class B03(XHole):
         JXB03_up = 0.0
         JXB03_down = 0.0
         JXB03 = 0.0
+        root_up = 0.0
+        root_down = 0.0                
         aa = ab = ac = ad = 0.0
         ba = bb = bc = bd = 0.0
 
         # Solve the alpha's xhole
-        if rho_up > 1.0e-8:
+        if rho_up > 1.0e-10:
             root_up = self.SolveSigma(rho_up, Q_up, eps_x_exact_up)
             aa, ab, ac, ad = self.GetParamsSigma(rho_up, Q_up, root_up)
             # used to calculate the energy density
@@ -170,7 +183,7 @@ class B03(XHole):
             JXB03_down = JXB03_up
 
         elif self.mol.spin > 0 and self.mol.nelectron > 1:
-            if rho_down > 1.0e-8:
+            if rho_down > 1.0e-10:
                 root_down = self.SolveSigma(rho_down, Q_down, eps_x_exact_down)
                 ba, bb, bc, bd = self.GetParamsSigma(rho_down, Q_down, root_down)
                 # used to calculate the energy density
@@ -179,7 +192,7 @@ class B03(XHole):
 
         # calculate total JX
         # JXB03 = (0.25 * (1.0 + zeta) ** 2) * JXB03_up + (0.25 * (1.0 - zeta) ** 2) * JXB03_down
-        JXB03 = self.TotalHole(self.y_values, zeta, aa, ab, ac, ad, ba, bb, bc, bd)
+        JXB03 = self.TotalHole(self.y_values, zeta, aa, ab, ac, 0.0, ba, bb, bc, 0.0)
 
         # exchange energy density
         # self.exed[gridID] = np.sum(self.y_weights * self.y_values_power[1] * self.JXB03)

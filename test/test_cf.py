@@ -13,11 +13,11 @@ from cfx import CFX
 def main():
     
     systems = {
-            # "H" : { 
-            #     'name'         : 'Hydrogen',
-            #     'symbol'       : 'H',
-            #     'spin'         : 1,
-            #     'positions'    : [[ 0., 0., 0.]]},
+            "H" : { 
+                'name'         : 'Hydrogen',
+                'symbol'       : 'H',
+                'spin'         : 1,
+                'positions'    : [[ 0., 0., 0.]]},
             "Li" : {
                 'name'         : 'Lithium',
                 'symbol'       : 'Li',
@@ -73,6 +73,6 @@ def main():
         # xc = cfx.CalculateTotalXC()
         e = cfx.CalculateTotalEnergy()
         end = timer()
-        print('CFX E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e} in '.format(e, x, c, xc, (end - start)))                
+        print('CFX E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e} in {:.12e} seconds'.format(e, x, c, xc, (end - start)))                
 if __name__ == "__main__":
     main()

@@ -251,12 +251,10 @@ class CFX(CF):
                 PBE_JXBRN = brn_xhole.CalculateJX(rho_up, rho_down, pbe_eps_x_up, pbe_eps_x_down)            
                 C, D = self.CalculateCD(rho, kf, pbe_eps_xc, PBE_JXBRN, A, B, E)
                 
-                # print('Parameters: A = {:.12e}\tB = {:.12e}\tC = {:.12e}\tD = {:.12e}\tE = {:.12e}'.format(A, B, C, D, E))
-
                 # return 0.0
                 # CFX
                 EXACT_JXB03 = b03_xhole.CalculateJX(rho_up, rho_down, Q_up, Q_down, exact_eps_x_up, exact_eps_x_down)
-
+                
                 #to calculate C and energy 
                 m1 = self.CalculateMomentJXE(1, EXACT_JXB03, E)
                 m2 = self.CalculateMomentJXE(2, EXACT_JXB03, E)
@@ -267,7 +265,6 @@ class CFX(CF):
                 C = -(3. * np.pi / 4. + m2 * A + m3 * B + m6 * D) / m4
                 cfx_eps_xc[gridID] = 2. * np.pi * rho / kf ** 2 *(A * m1 + B * m2 + C * m3 + D * m5)
                 # cfx_xc += weight * rho * cfx_eps_xc[gridID]
-                print('Parameters: A = {:.12e}\tB = {:.12e}\tC = {:.12e}\tD = {:.12e}\tE = {:.12e}'.format(A, B, C, D, E))
         cfx_xc = np.sum(self.kskernel.weights * rho_arr * cfx_eps_xc)
         
         return cfx_xc
