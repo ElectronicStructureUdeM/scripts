@@ -84,6 +84,27 @@ def atomization(mol,positions,spin,functional):
     print("End calculate atomization energy for "+mol+"\n")
 
     out.close()
+
+
+        # self.mol_name = molecule
+        # self.mol = gto.Mole()
+
+        # if ASE == True:
+        #   atoms = re.findall('[A-Z][^A-Z]*', molecule)
+        #   molecule = []
+        #   nAtom = 0
+        #   for atom in atoms:
+        #     atom_pos = positions[nAtom]
+        #     molecule.append([atom, (atom_pos[0], atom_pos[1], atom_pos[2])])
+        #     nAtom = nAtom+1
+            
+        # self.mol.atom = molecule
+        # self.mol.verbose = 0
+        # self.mol.spin = spin
+        # self.mol.basis = basis # downloaded from BSE
+        # self.mol.cart = True
+        # self.mol.build()
+
 # All the geometries were optimized at the PBE/6-311+g(2d,p) level
 functional = sys.argv[1]
 #H2

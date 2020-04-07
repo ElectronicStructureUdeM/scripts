@@ -1,6 +1,8 @@
 from pyscf import dft,gto,lib,scf
 import re
 import numpy as np
+from numba import vectorize,float64
+from BRx import brhparam
 class ModelXC:
     def __init__(self,molecule,positions,spin,approx='pbe,pbe',basis='6-311+g2dp.nw',num_threads=1, ASE=True):
         """
@@ -21,6 +23,7 @@ class ModelXC:
         """
         lib.num_threads(num_threads)
         self.approx=approx
+        self.mol_name=molecule
         self.mol = gto.Mole()
         if ASE == True:
           atoms = re.findall('[A-Z][^A-Z]*', molecule)
@@ -54,12 +57,17 @@ class ModelXC:
             self.dm_down = self.dm_up
             self.rho_up,self.dx_rho_up,self.dy_rho_up,self.dz_rho_up,self.lap_up,self.tau_up = \
                                     dft.numint.eval_rho(self.mol, self.ao_values, self.dm_up, xctype="MGGA")
+            grad_squared_up = self.dx_rho_up**2+self.dy_rho_up**2+self.dz_rho_up**2
+            self.D_up = self.tau_up*2-(1./4.)*grad_squared_up/self.rho_up
+            self.Q_up = 1./6.*(self.lap_up-2.*self.D_up)
             self.rho_down=self.rho_up
             self.dx_rho_down=self.dx_rho_up
             self.dy_rho_down=self.dy_rho_up
             self.dz_rho_down=self.dz_rho_up
             self.lap_down= self.lap_up
             self.tau_down = self.tau_up
+            self.D_down = self.D_up
+            self.Q_down = self.Q_up
             
         else:
             dm = self.mf.make_rdm1()
@@ -70,7 +78,36 @@ class ModelXC:
 
             self.rho_down,self.dx_rho_down,self.dy_rho_down,self.dz_rho_down,self.lap_down,self.tau_down = \
                         dft.numint.eval_rho(self.mol, self.ao_values, self.dm_down, xctype="MGGA")
+            grad_squared_up = self.dx_rho_up**2+self.dy_rho_up**2+self.dz_rho_up**2
+            self.D_up = self.tau_up*2-(1./4.)*grad_squared_up/self.rho_up
+            self.Q_up = 1./6.*(self.lap_up-2.*self.D_up) 
+            #
+            grad_squared_down = self.dx_rho_down**2+self.dy_rho_down**2+self.dz_rho_down**2
+            self.D_down = self.tau_down*2-(1./4.)*grad_squared_down/self.rho_down
+            self.Q_down = 1./6.*(self.lap_down-2.*self.D_down)           
         self.rho_tot = self.rho_up+self.rho_down
+        self.zeta = (self.rho_up-self.rho_down)/self.rho_tot
+        self.kf = (3.*np.pi**2*self.rho_tot)**(1./3.)
+        self.rs = (3./(4.*np.pi*self.rho_tot))**(1./3.)
+        # ex ks stuff
+        self.calc_eps_xks_post_approx()
+        # for BR03 stuff
+        self.br_a_up,self.br_b_up,self.br_c_up,self.br_n_up = brhparam(self.Q_up,
+                                                                    self.rho_up,self.eps_x_exact_up)
+        if (self.mol.spin==0 ):
+            self.br_a_down = self.br_a_up
+            self.br_b_down = self.br_b_up
+            self.br_c_down = self.br_c_up
+            self.br_n_down = self.br_n_up
+        elif (self.mol.nelectron==1):
+            self.br_a_down = np.zeros(self.n_grid)
+            self.br_b_down = np.zeros(self.n_grid)
+            self.br_c_down = np.zeros(self.n_grid)
+            self.br_n_down = np.zeros(self.n_grid)
+        else:
+            self.br_a_down,self.br_b_down,self.br_c_down,self.br_n_down = brhparam(self.Q_down,
+                                                                        self.rho_down,self.eps_x_exact_down)
+        
     def compute_ex_exact(self,ao_value,dm,coord):
         """
         Function to compute the exact kohn sham exchange energy density
@@ -98,6 +135,7 @@ class ModelXC:
         """
         self.ex_exact_up=np.zeros(self.n_grid)
         self.ex_exact_down=np.zeros(self.n_grid)
+        
         if self.mol.spin==0:
             #EX exact
             for gridID in range(self.n_grid):
@@ -110,6 +148,9 @@ class ModelXC:
                                                 self.dm_up,self.coords[gridID])
                 self.ex_exact_down[gridID] = self.compute_ex_exact(self.ao_values[0,gridID,:],
                                                 self.dm_down,self.coords[gridID])
+        self.eps_x_exact_up = self.ex_exact_up/self.rho_up
+        self.eps_x_exact_down = self.ex_exact_down/self.rho_down
+        
     def calc_Exks_post_approx(self):
         """
         Function to compute the total exchange energy of a molecule with 
@@ -117,15 +158,11 @@ class ModelXC:
         The energies are are calculated post-approx (not self-consitent).
         """
 
-        try:
-            self.Ex_KS_tot= np.einsum('i,i->', self.ex_exact_up+self.ex_exact_down, 
+
+
+        self.Ex_KS_tot= np.einsum('i,i->', self.ex_exact_up+self.ex_exact_down, 
                                             self.weights)
-        except AttributeError:
-            self.calc_eps_xks_post_approx()
-            self.Ex_KS_tot= np.einsum('i,i->', self.ex_exact_up+self.ex_exact_down, 
-                                            self.weights)
-        finally:
-            return self.Ex_KS_tot
+        return self.Ex_KS_tot
     
     def calc_total_energy_Ex_ks(self):
         """
@@ -135,6 +172,7 @@ class ModelXC:
             return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
         except AttributeError:#if it was never calculated before
             self.calc_Exks_post_approx()
+            print('E = {:.12e}\tX = {:.12e}\tC = {:.12e}\tXC = {:.12e}'.format(self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot, self.approx_Exc, 0.0, 0.0))
             return self.mf.e_tot-self.approx_Exc+self.Ex_KS_tot
             
     def calc_eps_xc_post_approx(self,functional):
